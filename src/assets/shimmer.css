@@ -1,0 +1,157 @@
+/**
+ * Shimmer animation styles
+ * Provides a sword-like shimmer effect for elements
+ */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  40% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  70% {
+    opacity: 1;
+  }
+  90% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer-text {
+  0% {
+    background-position: -200% center;
+  }
+  45% {
+    background-position: 200% center;
+  }
+  50% {
+    background-position: -200% center;
+  }
+  95% {
+    background-position: 200% center;
+  }
+  96%,
+  100% {
+    background-position: 200% center;
+    -webkit-text-fill-color: currentColor;
+    background: none;
+  }
+}
+
+@keyframes symbol-rotate {
+  0% {
+    content: "◐";
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    content: "◓";
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    content: "◑";
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  75% {
+    content: "◒";
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    content: "◐";
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.shimmer-once {
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(
+    105deg,
+    currentColor 0%,
+    currentColor 40%,
+    #d97757 50%,
+    currentColor 60%,
+    currentColor 100%
+  );
+  background-size: 200% auto;
+  background-position: -200% center;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer-text 1s ease-out forwards;
+}
+
+.rotating-symbol {
+  display: inline-block;
+  color: #d97757;
+  font-size: 1.5rem; /* Make it bigger! */
+  margin-right: 0.5rem;
+  font-weight: bold;
+  vertical-align: middle;
+  position: relative;
+  line-height: 1;
+  top: -2px;
+}
+
+.rotating-symbol::before {
+  content: "◐";
+  display: inline-block;
+  animation: symbol-rotate 2s linear infinite;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.shimmer-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-hover::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 100%;
+  height: 200%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(217, 119, 87, 0.4) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  transform: translateX(-100%) rotate(-10deg);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.shimmer-hover > * {
+  position: relative;
+  z-index: 2;
+}
+
+.shimmer-hover:hover::before {
+  animation: shimmer 1s ease-out;
+}
