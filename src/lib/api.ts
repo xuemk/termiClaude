@@ -656,6 +656,34 @@ export const api = {
   },
 
   /**
+   * Updates Claude settings.json with environment variables from active group
+   * @param groupId - The ID of the active environment group
+   * @returns Promise resolving when the settings are updated
+   */
+  async updateClaudeSettingsWithEnvGroup(groupId: number | null): Promise<string> {
+    try {
+      return await invoke<string>("update_claude_settings_with_env_group", { groupId });
+    } catch (error) {
+      logger.error("Failed to update Claude settings with environment group:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Updates Claude settings.json with selected model
+   * @param modelId - The ID of the selected model
+   * @returns Promise resolving when the settings are updated
+   */
+  async updateClaudeSettingsWithModel(modelId: string): Promise<string> {
+    try {
+      return await invoke<string>("update_claude_settings_with_model", { modelId });
+    } catch (error) {
+      logger.error("Failed to update Claude settings with model:", error);
+      throw error;
+    }
+  },
+
+  /**
    * Finds all CLAUDE.md files in a project directory
    * @param projectPath - The absolute path to the project
    * @returns Promise resolving to an array of CLAUDE.md files

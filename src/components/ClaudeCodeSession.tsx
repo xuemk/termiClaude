@@ -17,8 +17,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+<<<<<<< HEAD
 import { Popover } from "@/components/ui/popover";
 import { api, type Session } from "@/lib/api";
+=======
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { api, type Session, type EnvironmentVariableGroup } from "@/lib/api";
+>>>>>>> 8849a3a (修改分组和模型时会实时写入claude配置文件)
 import { type ClaudeModel } from "@/types/models";
 import { cn } from "@/lib/utils";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -212,6 +217,71 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   // Get message display mode
   const { mode: messageDisplayMode } = useMessageDisplayMode();
 
+<<<<<<< HEAD
+=======
+  // 加载环境分组
+  const loadEnvironmentGroups = useCallback(async () => {
+    try {
+      setLoadingEnvGroups(true);
+      const groups = await api.getEnvironmentVariableGroups();
+      setEnvGroups(groups);
+      
+      // 设置当前启用的分组为选中状态
+      let enabledGroup = groups.find(g => g.enabled);
+      
+      // 如果没有启用的分组但有分组存在，自动启用第一个
+      if (!enabledGroup && groups.length > 0) {
+        enabledGroup = groups[0];
+        try {
+          await api.updateEnvironmentVariableGroup(
+            enabledGroup.id!,
+            enabledGroup.name,
+            enabledGroup.description,
+            true,
+            enabledGroup.sort_order
+          );
+          enabledGroup.enabled = true;
+          logger.info(`Auto-enabled first environment group: ${enabledGroup.name}`);
+        } catch (error) {
+          logger.error("Failed to auto-enable first environment group:", error);
+        }
+      }
+      
+      setSelectedEnvGroup(enabledGroup?.id || null);
+      
+      // 更新 Claude settings.json 文件以确保默认环境变量生效
+      if (enabledGroup?.id) {
+        try {
+          await api.updateClaudeSettingsWithEnvGroup(enabledGroup.id);
+          logger.info(`Updated Claude settings.json with default environment group: ${enabledGroup.name}`);
+        } catch (error) {
+          logger.error("Failed to update Claude settings.json with default environment group:", error);
+        }
+      }
+      
+      logger.debug(`Loaded ${groups.length} environment groups, selected: ${enabledGroup?.name || 'none'}`);
+    } catch (error) {
+      logger.error("Failed to load environment groups:", error);
+    } finally {
+      setLoadingEnvGroups(false);
+    }
+  }, []);
+
+  // 监听环境变量更新和刷新事件
+  useEffect(() => {
+    loadEnvironmentGroups();
+    
+    // 监听环境变量更新事件
+    const handleEnvUpdate = () => {
+      logger.debug("Environment groups updated, reloading...");
+      loadEnvironmentGroups();
+    };
+    
+    window.addEventListener('environment-groups-updated', handleEnvUpdate);
+    return () => window.removeEventListener('environment-groups-updated', handleEnvUpdate);
+  }, [loadEnvironmentGroups]);
+
+>>>>>>> 8849a3a (修改分组和模型时会实时写入claude配置文件)
   // Helper function to extract text content from various content formats
   const extractTextFromContent = useCallback((content: any): string => {
     if (typeof content === "string") {
@@ -847,6 +917,60 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   };
 
   /**
+<<<<<<< HEAD
+=======
+   * Handle environment group change
+   */
+  const handleEnvGroupChange = async (groupId: string) => {
+    if (loadingEnvGroups) return;
+    
+    const selectedId = parseInt(groupId);
+    
+    try {
+      setLoadingEnvGroups(true);
+      
+      // 禁用其他所有分组，启用选中的分组
+      for (const group of envGroups) {
+        const shouldEnable = group.id === selectedId;
+        if (group.enabled !== shouldEnable) {
+          await api.updateEnvironmentVariableGroup(
+            group.id!,
+            group.name,
+            group.description,
+            shouldEnable,
+            group.sort_order
+          );
+        }
+      }
+      
+      setSelectedEnvGroup(selectedId);
+      
+      // 更新 Claude settings.json 文件以应用环境变量
+      try {
+        await api.updateClaudeSettingsWithEnvGroup(selectedId);
+        logger.info("Claude settings.json updated with environment variables");
+      } catch (error) {
+        logger.error("Failed to update Claude settings.json:", error);
+      }
+      
+      // 刷新环境变量和模型配置
+      handleRefreshEnvironment();
+      
+      // 通知设置页面更新分组状态
+      window.dispatchEvent(new CustomEvent('environment-groups-updated'));
+      
+      const selectedGroupName = envGroups.find(g => g.id === selectedId)?.name || 'unknown';
+      logger.info(`Switched to environment group: ${selectedGroupName}`);
+      
+    } catch (error) {
+      logger.error("Failed to switch environment group:", error);
+    } finally {
+      setLoadingEnvGroups(false);
+    }
+  };
+
+  /**
+>>>>>>> 8849a3a (修改分组和模型时会实时写入claude配置文件)
    * Handle refreshing environment variables and model configuration
    */
   const handleRefreshEnvironment = () => {
@@ -1736,7 +1860,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       }}
     >
       <motion.div
-        className="relative w-full max-w-5xl mx-auto px-4 pt-8 pb-4"
+        className="relative w-full mx-auto px-2 pt-8 pb-4"
         style={{
           height: `${Math.max(rowVirtualizer.getTotalSize(), 100)}px`,
           minHeight: "100px",
@@ -1749,7 +1873,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 key={virtualItem.key}
                 data-index={virtualItem.index}
                 ref={(el) => el && rowVirtualizer.measureElement(el)}
-                className="absolute inset-x-4 pb-4"
+                className="absolute inset-x-2 pb-4"
                 style={{
                   top: virtualItem.start,
                 }}
@@ -1779,7 +1903,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-40 w-full max-w-5xl mx-auto"
+                          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-40 w-full mx-auto"
         >
           {error}
         </motion.div>
@@ -1929,37 +2053,16 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                     </Button>
             )}
             {messages.length > 0 && (
-              <Popover
-                trigger={(
-                  <Button variant="ghost" size="sm" className="flex items-center gap-1 h-6 px-2 text-xs">
-                    <Copy className="h-2.5 w-2.5" />
-                    {t.sessions.copyOutput}
-                    <ChevronDown className="h-2 w-2" />
-                  </Button>
-                )}
-                content={
-                  <motion.div className="w-44 p-1">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={handleCopyAsMarkdown}
-                      className="w-full justify-start"
+                className="flex items-center gap-1 h-6 px-2 text-xs"
+                onClick={() => setCopyPopoverOpen(true)}
                     >
-                      {t.sessions.copyAsMarkdown}
+                <Copy className="h-2.5 w-2.5" />
+                {t.sessions.copyOutput}
+                <ChevronDown className="h-2 w-2" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCopyAsJsonl}
-                      className="w-full justify-start"
-                    >
-                      {t.sessions.copyAsJsonl}
-                    </Button>
-                  </motion.div>
-                }
-                open={copyPopoverOpen}
-                onOpenChange={setCopyPopoverOpen}
-              />
             )}
           </motion.div>
         </motion.div>
@@ -1997,7 +2100,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             />
           ) : (
             // Original layout when no preview
-            <motion.div className="h-full flex flex-col max-w-5xl mx-auto">
+            <motion.div className="h-full flex flex-col mx-auto px-2">
               {projectPathInput}
               {messagesList}
 
@@ -2034,7 +2137,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
-                className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4"
+                className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 w-full px-2"
               >
                 <motion.div className="bg-background/95 backdrop-blur-md border rounded-lg shadow-lg p-3 space-y-2">
                   <motion.div className="flex items-center justify-between">
@@ -2112,7 +2215,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
               transition={{ delay: 0.5 }}
               className="fixed bottom-32 right-6 z-50"
             >
-              <motion.div className="flex items-center bg-background/95 backdrop-blur-md border rounded-full shadow-lg overflow-hidden">
+              <motion.div className="flex flex-col items-center bg-background/95 backdrop-blur-md border rounded-xl shadow-lg overflow-hidden">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2139,12 +2242,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                       }, 500); // Wait for smooth scroll to complete
                     }
                   }}
-                  className="px-3 py-2 hover:bg-accent rounded-none"
+                  className="px-2 py-2 hover:bg-accent rounded-none"
                   title="Scroll to top"
                 >
                   <ChevronUp className="h-4 w-4" />
                 </Button>
-                <motion.div className="w-px h-4 bg-border" />
+                <motion.div className="h-px w-4 bg-border" />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -2161,7 +2264,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                       }
                     }
                   }}
-                  className="px-3 py-2 hover:bg-accent rounded-none"
+                  className="px-2 py-2 hover:bg-accent rounded-none"
                   title="Scroll to bottom"
                 >
                   <ChevronDown className="h-4 w-4" />
@@ -2185,7 +2288,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           {/* Token Counter - positioned under the Send button */}
           {totalTokens > 0 && (
             <motion.div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
-              <motion.div className="max-w-5xl mx-auto">
+              <motion.div className="mx-auto px-2">
                 <motion.div className="flex justify-end px-4 pb-2">
                   <motion.div
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -2313,6 +2416,45 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             <motion.div className="flex-1 overflow-y-auto">
               <SlashCommandsManager projectPath={projectPath} />
             </motion.div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Copy Output Dialog */}
+      {copyPopoverOpen && (
+        <Dialog open={copyPopoverOpen} onOpenChange={setCopyPopoverOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t.sessions.copyOutput}</DialogTitle>
+              <DialogDescription>
+                选择要复制的格式
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyAsMarkdown}
+                className="w-full justify-start h-10"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                {t.sessions.copyAsMarkdown}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyAsJsonl}
+                className="w-full justify-start h-10"
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                {t.sessions.copyAsJsonl}
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setCopyPopoverOpen(false)}>
+                取消
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

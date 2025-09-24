@@ -134,6 +134,43 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
 
   // Message display mode state
   const [messageDisplayMode, setMessageDisplayMode] = useState<'both' | 'tool_calls_only'>('both');
+<<<<<<< HEAD
+=======
+  // 重新加载环境分组状态（用于实时同步）
+  const reloadEnvironmentGroups = useCallback(async () => {
+    try {
+      // 重新加载环境变量分组
+      const groups = await api.getEnvironmentVariableGroups();
+      setEnvGroups(groups);
+      logger.debug(`Reloaded ${groups.length} environment variable groups for sync`);
+      
+      // 重新加载环境变量
+      const dbEnvVars = await api.getEnvironmentVariables();
+      const normalizedVars = dbEnvVars.map(envVar => ({
+        ...envVar,
+        enabled: envVar.enabled ?? true,
+        group_id: envVar.group_id ?? undefined,
+        sort_order: envVar.sort_order ?? 0,
+      }));
+      setEnvVars(normalizedVars);
+      logger.debug(`Reloaded ${normalizedVars.length} environment variables for sync`);
+      
+      // 更新 Claude settings.json 文件以确保当前启用的环境变量生效
+      const enabledGroup = groups.find(g => g.enabled);
+      if (enabledGroup?.id) {
+        try {
+          await api.updateClaudeSettingsWithEnvGroup(enabledGroup.id);
+          logger.info(`Updated Claude settings.json with current environment group: ${enabledGroup.name}`);
+        } catch (error) {
+          logger.error("Failed to update Claude settings.json during settings reload:", error);
+        }
+      }
+    } catch (error) {
+      logger.error("Failed to reload environment groups for sync:", error);
+    }
+  }, []);
+
+>>>>>>> 8849a3a (修改分组和模型时会实时写入claude配置文件)
   // Load settings on mount
   useEffect(() => {
     console.log("Settings component mounted, loading settings...");
@@ -224,55 +261,8 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
         console.log(`Loaded ${dbEnvVars.length} environment variables from database:`, dbEnvVars);
         logger.debug(`Loaded ${dbEnvVars.length} environment variables from database`);
         
-        // 从 Claude 设置中迁移所有环境变量到数据库（不再只迁移特定的三个）
-        
-        if (loadedSettings.env && 
-            typeof loadedSettings.env === "object" && 
-            !Array.isArray(loadedSettings.env)) {
-          
-          // 从 Claude 设置中的 env 对象迁移所有键值对
-          const envToMigrate = Object.entries(loadedSettings.env as Record<string, unknown>)
-            .map(([key, value]) => ({
-              key,
-              value: String(value ?? ""),
-              enabled: true,
-              sort_order: 0,
-              group_id: undefined,
-            }));
-          
-          if (envToMigrate.length > 0) {
-            logger.debug(`Found ${envToMigrate.length} environment variables in Claude settings for migration: ${envToMigrate.map(v => v.key).join(', ')}`);
-            
-            // Merge with existing database variables, with Claude settings taking precedence for conflicts
-            const existingKeys = new Set(dbEnvVars.map(v => v.key));
-            const newVars = envToMigrate.filter(v => !existingKeys.has(v.key));
-            const allVars = [...dbEnvVars, ...newVars];
-            
-            // Update any existing variables with values from Claude settings
-            const finalVars = allVars.map(dbVar => {
-              const claudeVar = envToMigrate.find(mv => mv.key === dbVar.key);
-              return claudeVar ? { 
-                ...dbVar, 
-                value: claudeVar.value,
-                enabled: dbVar.enabled ?? true, // Ensure enabled field exists
-                group_id: (dbVar as DbEnvironmentVariable).group_id ?? undefined,
-                sort_order: dbVar.sort_order ?? 0,
-              } : {
-                ...dbVar,
-                enabled: dbVar.enabled ?? true, // Ensure enabled field exists
-                group_id: (dbVar as DbEnvironmentVariable).group_id ?? undefined,
-                sort_order: dbVar.sort_order ?? 0,
-              };
-            });
-            
-            await api.saveEnvironmentVariables(finalVars);
-            logger.info(`Migrated ${envToMigrate.length} environment variables from Claude settings to database: ${envToMigrate.map(v => v.key).join(', ')}`);
-            
-            // Do not remove env from Claude settings - keep other environment variables intact
-            setEnvVars(finalVars);
-          } else {
-            logger.debug("No environment variables found in Claude settings for migration");
-            // Ensure all variables have the required fields with defaults
+        // 直接使用数据库中的环境变量，不从外部迁移
+        logger.debug("Using environment variables from database only, no migration from Claude settings");
             const normalizedVars = dbEnvVars.map(envVar => ({
               ...envVar,
               enabled: envVar.enabled ?? true,
@@ -280,18 +270,6 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
               sort_order: envVar.sort_order ?? 0,
             }));
             setEnvVars(normalizedVars);
-          }
-        } else {
-          logger.debug("No environment variables found in Claude settings, using database variables only");
-          // Ensure all variables have the required fields with defaults
-          const normalizedVars = dbEnvVars.map(envVar => ({
-            ...envVar,
-            enabled: envVar.enabled ?? true,
-            group_id: envVar.group_id ?? undefined,
-            sort_order: envVar.sort_order ?? 0,
-          }));
-          setEnvVars(normalizedVars);
-        }
 
         // Load environment variable groups
         try {
@@ -304,22 +282,8 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
         }
       } catch (error) {
         logger.error("Failed to load environment variables from database:", error);
-        // Fallback to Claude settings if database fails
-        if (
-          loadedSettings.env &&
-          typeof loadedSettings.env === "object" &&
-          !Array.isArray(loadedSettings.env)
-        ) {
-          setEnvVars(
-            Object.entries(loadedSettings.env).map(([key, value]) => ({
-              key,
-              value: value as string,
-              enabled: true,
-              group_id: undefined,
-              sort_order: 0,
-            }))
-          );
-        }
+        // 数据库加载失败时使用空数组，不从外部迁移
+        setEnvVars([]);
       }
 
       // Load audio notification config from localStorage (independent of Claude settings)
@@ -353,6 +317,17 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
       // Handle legacy 'tool_results_only' by converting to 'tool_calls_only'
       const normalizedMode = (savedDisplayMode as string) === 'tool_results_only' ? 'tool_calls_only' : savedDisplayMode;
       setMessageDisplayMode(normalizedMode as 'both' | 'tool_calls_only');
+      
+      // 首次加载设置时，更新 Claude settings.json 以确保当前启用的环境变量生效
+      try {
+        const enabledGroup = envGroups.find(g => g.enabled);
+        if (enabledGroup?.id) {
+          await api.updateClaudeSettingsWithEnvGroup(enabledGroup.id);
+          logger.info(`Settings init: Updated Claude settings.json with environment group: ${enabledGroup.name}`);
+        }
+      } catch (error) {
+        logger.error("Failed to update Claude settings.json during settings initialization:", error);
+      }
     } catch (err) {
       await handleError("Failed to load settings:", { context: err });
       setError(t.settings.failedToLoadSettings);
@@ -659,8 +634,28 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
           });
           setEnvVars(updatedVars);
           
-          // 更新数据库中的所有环境变量
-          await api.saveEnvironmentVariables(updatedVars);
+          // 验证并修复数据一致性后再保存
+          const seenKeys = new Map<string, DbEnvironmentVariable>();
+          const validatedVars: DbEnvironmentVariable[] = [];
+          
+          for (const envVar of updatedVars) {
+            const keyGroupKey = `${envVar.group_id || 0}-${envVar.key.trim()}`;
+            
+            if (seenKeys.has(keyGroupKey)) {
+              const existing = seenKeys.get(keyGroupKey)!;
+                         logger.warn(`Duplicate key found during toggle: ${envVar.key} in group ${envVar.group_id}. Existing value: "${existing.value}", New value: "${envVar.value}". Keeping existing.`);
+              continue; // 保留原有值，忽略重复项
+            } else {
+              seenKeys.set(keyGroupKey, envVar);
+              validatedVars.push(envVar);
+            }
+          }
+          
+          if (validatedVars.length !== updatedVars.length) {
+            logger.warn(`Removed ${updatedVars.length - validatedVars.length} duplicate environment variables during toggle`);
+          }
+          
+          await api.saveEnvironmentVariables(validatedVars);
         }
         
         // 更新组状态：启用当前组，禁用所有其他组
@@ -675,7 +670,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
       }
 
       // 更新当前组
-      const updatedGroup = await api.updateEnvironmentVariableGroup(
+      await api.updateEnvironmentVariableGroup(
         groupId,
         group.name,
         group.description,
@@ -683,13 +678,42 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
         group.sort_order
       );
       
-      if (!enabled) {
-        setEnvGroups(groups => 
-          groups.map(g => g.id === groupId ? updatedGroup : g)
-        );
+      // 重新加载所有环境变量分组和变量，确保数据一致性
+      try {
+        const refreshedGroups = await api.getEnvironmentVariableGroups();
+        setEnvGroups(refreshedGroups);
+        
+        const refreshedVars = await api.getEnvironmentVariables();
+        const normalizedVars = refreshedVars.map(envVar => ({
+          ...envVar,
+          enabled: envVar.enabled ?? true,
+          group_id: envVar.group_id ?? undefined,
+          sort_order: envVar.sort_order ?? 0,
+        }));
+        setEnvVars(normalizedVars);
+        
+        logger.info(`Reloaded environment data after toggle: ${refreshedGroups.length} groups, ${normalizedVars.length} variables`);
+      } catch (error) {
+        logger.error("Failed to reload environment data after toggle:", error);
       }
       
       logger.info(`Toggled group ${group.name} to ${enabled ? 'enabled' : 'disabled'}`);
+<<<<<<< HEAD
+=======
+      
+      // 更新 Claude settings.json 文件以应用环境变量
+      if (enabled) {
+        try {
+          await api.updateClaudeSettingsWithEnvGroup(groupId);
+          logger.info("Claude settings.json updated with environment variables from settings page");
+        } catch (error) {
+          logger.error("Failed to update Claude settings.json from settings page:", error);
+        }
+      }
+      
+      // 触发环境分组更新事件，同步主界面下拉框状态
+      window.dispatchEvent(new CustomEvent('environment-groups-updated'));
+>>>>>>> 8849a3a (修改分组和模型时会实时写入claude配置文件)
     } catch (error) {
       logger.error("Failed to toggle group enabled state:", error);
       setToast({ message: "Failed to update group", type: "error" });
@@ -752,9 +776,32 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
     
     setEnvVars(updatedVars);
     
-    // 批量保存所有环境变量到数据库
+    // 验证数据一致性并保存到数据库
     try {
-      await api.saveEnvironmentVariables(updatedVars);
+      // 验证是否有重复键名
+      const seenKeys = new Map<string, DbEnvironmentVariable>();
+      const validatedVars: DbEnvironmentVariable[] = [];
+      
+      for (const envVar of updatedVars) {
+        const keyGroupKey = `${envVar.group_id || 0}-${envVar.key.trim()}`;
+        
+        if (seenKeys.has(keyGroupKey)) {
+          const existing = seenKeys.get(keyGroupKey)!;
+                     logger.warn(`Duplicate key found during update: ${envVar.key} in group ${envVar.group_id}. Existing value: "${existing.value}", New value: "${envVar.value}". Keeping existing.`);
+          continue; // 保留原有值，忽略重复项
+        } else {
+          seenKeys.set(keyGroupKey, envVar);
+          validatedVars.push(envVar);
+        }
+      }
+      
+      if (validatedVars.length !== updatedVars.length) {
+        logger.warn(`updateEnvVar: Removed ${updatedVars.length - validatedVars.length} duplicate environment variables`);
+        // 如果有重复项被移除，更新前端状态以保持一致
+        setEnvVars(validatedVars);
+      }
+      
+      await api.saveEnvironmentVariables(validatedVars);
     } catch (error) {
       logger.error("Failed to save environment variable:", error);
       setToast({ message: "Failed to save environment variable", type: "error" });

@@ -971,6 +971,191 @@ pub async fn save_claude_settings(settings: serde_json::Value) -> Result<String,
     Ok("Settings saved successfully".to_string())
 }
 
+/// Updates Claude settings.json with environment variables from active group
+#[tauri::command]
+pub async fn update_claude_settings_with_env_group(
+    app: AppHandle,
+    group_id: Option<i64>,
+) -> Result<String, String> {
+    use crate::commands::agents::{AgentDb, get_enabled_environment_variables};
+    
+    log::info!("Updating Claude settings.json with environment group: {:?}", group_id);
+
+    // Get enabled environment variables from database
+    let env_vars = match get_enabled_environment_variables(app.state::<AgentDb>()).await {
+        Ok(vars) => vars,
+        Err(e) => {
+            log::warn!("Failed to get environment variables: {}", e);
+            return Err(format!("Failed to get environment variables: {}", e));
+        }
+    };
+
+    let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;
+    let settings_path = claude_dir.join("settings.json");
+
+    // Read current settings or create empty object
+    let mut settings: serde_json::Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .map_err(|e| format!("Failed to read settings file: {}", e))?;
+        
+        // Handle empty or invalid JSON files
+        if content.trim().is_empty() {
+            log::info!("Settings file is empty, creating new JSON object");
+            serde_json::json!({})
+        } else {
+            match serde_json::from_str(&content) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    log::warn!("Failed to parse settings JSON ({}), creating new JSON object", e);
+                    serde_json::json!({})
+                }
+            }
+        }
+    } else {
+        log::info!("Settings file does not exist, creating new JSON object");
+        serde_json::json!({})
+    };
+
+    // Ensure settings is an object
+    if !settings.is_object() {
+        settings = serde_json::json!({});
+    }
+
+    // Update env object with environment variables
+    let settings_obj = settings.as_object_mut().unwrap();
+    
+    // Ensure env object exists
+    if !settings_obj.contains_key("env") {
+        settings_obj.insert("env".to_string(), serde_json::json!({}));
+    }
+    
+    let env_obj = settings_obj.get_mut("env").unwrap().as_object_mut().unwrap();
+    
+    // Update ANTHROPIC_AUTH_TOKEN
+    if let Some(token) = env_vars.get("ANTHROPIC_AUTH_TOKEN") {
+        env_obj.insert("ANTHROPIC_AUTH_TOKEN".to_string(), serde_json::Value::String(token.clone()));
+        log::info!("Updated ANTHROPIC_AUTH_TOKEN in settings.json env from environment");
+    } else {
+        env_obj.remove("ANTHROPIC_AUTH_TOKEN");
+        log::info!("Removed ANTHROPIC_AUTH_TOKEN from settings.json env (not set in environment)");
+    }
+
+    // Update ANTHROPIC_BASE_URL
+    if let Some(base_url) = env_vars.get("ANTHROPIC_BASE_URL") {
+        env_obj.insert("ANTHROPIC_BASE_URL".to_string(), serde_json::Value::String(base_url.clone()));
+        log::info!("Updated ANTHROPIC_BASE_URL in settings.json env from environment: {}", base_url);
+    } else {
+        env_obj.remove("ANTHROPIC_BASE_URL");
+        log::info!("Removed ANTHROPIC_BASE_URL from settings.json env (not set in environment)");
+    }
+
+    // Update ANTHROPIC_MODEL (check MID_x first, then ANTHROPIC_MODEL)
+    let mut model_to_use: Option<String> = None;
+    
+    // First check for MID_1, MID_2, MID_3, etc. (custom model configurations)
+    for i in 1..=10 {
+        let mid_key = format!("MID_{}", i);
+        if let Some(model) = env_vars.get(&mid_key) {
+            if !model.trim().is_empty() {
+                model_to_use = Some(model.clone());
+                log::info!("Found model ID in {}: {}", mid_key, model);
+                break;
+            }
+        }
+    }
+    
+    // If no MID_x found, check for direct ANTHROPIC_MODEL
+    if model_to_use.is_none() {
+        if let Some(model) = env_vars.get("ANTHROPIC_MODEL") {
+            if !model.trim().is_empty() {
+                model_to_use = Some(model.clone());
+                log::info!("Found direct ANTHROPIC_MODEL: {}", model);
+            }
+        }
+    }
+    
+    // Update or remove ANTHROPIC_MODEL in settings
+    if let Some(model) = model_to_use {
+        env_obj.insert("ANTHROPIC_MODEL".to_string(), serde_json::Value::String(model.clone()));
+        log::info!("Updated ANTHROPIC_MODEL in settings.json env: {}", model);
+    } else {
+        env_obj.remove("ANTHROPIC_MODEL");
+        log::info!("Removed ANTHROPIC_MODEL from settings.json env (no model found in environment)");
+    }
+
+    // Save updated settings
+    let json_string = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Failed to serialize updated settings: {}", e))?;
+
+    fs::write(&settings_path, json_string)
+        .map_err(|e| format!("Failed to write updated settings file: {}", e))?;
+
+    log::info!("Successfully updated Claude settings.json with environment variables");
+    Ok("Claude settings updated with environment variables".to_string())
+}
+
+/// Updates Claude settings.json with selected model
+#[tauri::command]
+pub async fn update_claude_settings_with_model(
+    model_id: String,
+) -> Result<String, String> {
+    log::info!("Updating Claude settings.json with model: {}", model_id);
+
+    let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;
+    let settings_path = claude_dir.join("settings.json");
+
+    // Read current settings or create empty object
+    let mut settings: serde_json::Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .map_err(|e| format!("Failed to read settings file: {}", e))?;
+        
+        // Handle empty or invalid JSON files
+        if content.trim().is_empty() {
+            log::info!("Settings file is empty, creating new JSON object for model update");
+            serde_json::json!({})
+        } else {
+            match serde_json::from_str(&content) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    log::warn!("Failed to parse settings JSON for model update ({}), creating new JSON object", e);
+                    serde_json::json!({})
+                }
+            }
+        }
+    } else {
+        log::info!("Settings file does not exist for model update, creating new JSON object");
+        serde_json::json!({})
+    };
+
+    // Ensure settings is an object
+    if !settings.is_object() {
+        settings = serde_json::json!({});
+    }
+
+    let settings_obj = settings.as_object_mut().unwrap();
+    
+    // Ensure env object exists
+    if !settings_obj.contains_key("env") {
+        settings_obj.insert("env".to_string(), serde_json::json!({}));
+    }
+    
+    let env_obj = settings_obj.get_mut("env").unwrap().as_object_mut().unwrap();
+    
+    // Update ANTHROPIC_MODEL
+    env_obj.insert("ANTHROPIC_MODEL".to_string(), serde_json::Value::String(model_id.clone()));
+    log::info!("Updated ANTHROPIC_MODEL in settings.json env: {}", model_id);
+
+    // Save updated settings
+    let json_string = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Failed to serialize updated settings: {}", e))?;
+
+    fs::write(&settings_path, json_string)
+        .map_err(|e| format!("Failed to write updated settings file: {}", e))?;
+
+    log::info!("Successfully updated Claude settings.json with model");
+    Ok("Claude settings updated with model".to_string())
+}
+
 /// Recursively finds all CLAUDE.md files in a project directory
 #[tauri::command]
 pub async fn find_claude_md_files(project_path: String) -> Result<Vec<ClaudeMdFile>, String> {

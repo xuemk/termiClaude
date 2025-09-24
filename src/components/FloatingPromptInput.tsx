@@ -305,6 +305,16 @@ const FloatingPromptInputInner = (
 
   const [prompt, setPrompt] = useState("");
   const [selectedModel, setSelectedModel] = useState<ClaudeModel>(""); // Start with empty string to force setting from dynamic models
+  
+  // 更新模型到Claude settings.json的辅助函数
+  const updateModelInSettings = useCallback(async (modelId: string) => {
+    try {
+      await api.updateClaudeSettingsWithModel(modelId);
+      logger.info(`Updated Claude settings.json with model: ${modelId}`);
+    } catch (error) {
+      logger.error("Failed to update Claude settings.json with model:", error);
+    }
+  }, []);
   const [selectedThinkingMode, setSelectedThinkingMode] = useState<ThinkingMode>("auto");
 
   // Set default model when models are loaded
@@ -316,6 +326,7 @@ const FloatingPromptInputInner = (
           ? defaultModel
           : models[0].id;
         setSelectedModel(defaultModelToUse);
+        updateModelInSettings(defaultModelToUse);
         logger.info(`[FloatingPromptInput] Set initial model to: ${defaultModelToUse} (reason: ${!selectedModel ? 'no model selected' : 'default model not available'})`);
       } else {
         // Check if currently selected model is still available
@@ -332,11 +343,12 @@ const FloatingPromptInputInner = (
             ? defaultModel
             : models[0].id;
           setSelectedModel(fallbackModel);
+          updateModelInSettings(fallbackModel);
           logger.info(`[FloatingPromptInput] Fallback to model: ${fallbackModel}`);
         }
       }
     }
-  }, [models, defaultModel]);
+  }, [models, defaultModel, updateModelInSettings]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [thinkingModePickerOpen, setThinkingModePickerOpen] = useState(false);
@@ -1120,7 +1132,7 @@ const FloatingPromptInputInner = (
       {/* Smart Floating Input Bar */}
       <motion.div
         className={cn(
-          "fixed bottom-4 left-4 right-4 z-40",
+          "fixed bottom-4 left-2 right-2 z-40",
           "bg-gradient-to-t from-background via-background/98 to-background/80",
           "backdrop-blur-md border border-border/50 rounded-lg shadow-xl",
           "transform-gpu will-change-transform", // 优化GPU渲染和布局稳定性
@@ -1150,7 +1162,7 @@ const FloatingPromptInputInner = (
           setIsVisible(true);
         }}
       >
-        <div className="max-w-5xl mx-auto relative">
+        <div className="mx-auto relative px-2">
           {/* Image previews */}
           {embeddedImages.length > 0 && (
             <ImagePreview
@@ -1195,6 +1207,7 @@ const FloatingPromptInputInner = (
                             logger.info(`[FloatingPromptInput] User manually selected model: ${model.id} (${model.name})`);
                             setSelectedModel(model.id);
                             setModelPickerOpen(false);
+                            updateModelInSettings(model.id);
                           }}
                           className={cn(
                             "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
