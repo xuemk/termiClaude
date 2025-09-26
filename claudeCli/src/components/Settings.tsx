@@ -636,7 +636,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
 
       // 使用原子性的互斥切换函数
       const updatedGroups = await api.toggleEnvironmentVariableGroupExclusive(groupId, enabled);
-      
+        
       // 更新本地状态
       setEnvGroups(updatedGroups);
       
@@ -661,7 +661,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
             // 更新localStorage，确保前端和后端状态一致
             localStorage.setItem('selected-model', mid1Var.value.trim());
             logger.info(`🔄 Updated localStorage selected-model to: ${mid1Var.value.trim()}`);
-            
+          
             // 同时调用updateClaudeSettingsWithModel确保完全同步
             try {
               await api.updateClaudeSettingsWithModel(mid1Var.value.trim());

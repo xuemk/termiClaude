@@ -49,7 +49,7 @@ use commands::storage::{
     storage_insert_row, storage_execute_sql, storage_reset_database,
     get_app_setting, save_app_setting,
 };
-use commands::proxy::{get_proxy_settings, save_proxy_settings, apply_proxy_settings};
+use commands::proxy::{get_proxy_settings, save_proxy_settings, apply_proxy_settings, test_proxy_connection};
 use process::ProcessRegistryState;
 use std::sync::Mutex;
 use tauri::Manager;
@@ -290,6 +290,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Proxy Settings
             get_proxy_settings,
             save_proxy_settings,
+            test_proxy_connection,
         ])
         .run(tauri::generate_context!())
         .map_err(|e| {

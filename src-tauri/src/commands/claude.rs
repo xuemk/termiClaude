@@ -260,6 +260,15 @@ fn create_command_with_custom_env(program: &str, custom_env: &std::collections::
             || key == "NVM_BIN"
             || key == "HOMEBREW_PREFIX"
             || key == "HOMEBREW_CELLAR"
+            // 🔧 关键修复：添加代理环境变量支持
+            || key == "HTTP_PROXY"
+            || key == "HTTPS_PROXY"
+            || key == "NO_PROXY"
+            || key == "ALL_PROXY"
+            || key == "http_proxy"
+            || key == "https_proxy"
+            || key == "no_proxy"
+            || key == "all_proxy"
         {
             debug_log!("Inheriting env var: {}={}", key, value);
             tokio_cmd.env(&key, &value);
@@ -320,6 +329,14 @@ fn create_command_with_custom_env(program: &str, custom_env: &std::collections::
     for (key, value) in custom_env {
         debug_log!("Setting custom env var: {}={}", key, value);
         tokio_cmd.env(key, value);
+    }
+
+    // 🔧 调试：记录代理相关的环境变量传递情况
+    log::info!("Claude Code CLI process will use proxy settings:");
+    for (key, value) in std::env::vars() {
+        if key.contains("PROXY") || key.contains("proxy") {
+            log::info!("  {}={}", key, value);
+        }
     }
 
     tokio_cmd
@@ -1072,9 +1089,9 @@ pub async fn update_claude_settings_with_env_group(
         
         // 获取存储的用户选择模型
         let stored_model = match crate::commands::storage::get_app_setting(
-            app.clone(), 
-            "current_selected_model".to_string()
-        ).await {
+        app.clone(), 
+        "current_selected_model".to_string()
+    ).await {
             Ok(Some(stored)) if !stored.is_empty() => Some(stored),
             _ => None
         };

@@ -7,7 +7,13 @@
 
 import { readFileSync, writeFileSync, existsSync } from "fs";
 // import { join } from 'path'; // Removed unused import
-import { logger as log } from "../src/lib/logger.ts";
+
+// 简单的日志函数，兼容Node.js环境
+const log = {
+  info: (...args) => console.log("[INFO]", ...args),
+  warn: (...args) => console.warn("[WARN]", ...args),
+  error: (...args) => console.error("[ERROR]", ...args)
+};
 
 // Read the original CLI file
 const cliPath = "./cli.js";

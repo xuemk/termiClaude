@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { useI18n } from '@/lib/i18n';
 
 export interface ProxySettings {
@@ -88,6 +89,32 @@ export function ProxySettings({ setToast, onChange }: ProxySettingsProps) {
     }));
   };
 
+  // 测试代理连接
+  const testProxyConnection = async () => {
+    try {
+      setToast({
+        message: '正在测试代理连接...',
+        type: 'success',
+      });
+      
+      const result = await invoke<string>('test_proxy_connection', { settings });
+      
+      setToast({
+        message: '代理测试完成，请查看控制台详细结果',
+        type: 'success',
+      });
+      
+      console.log('代理测试结果:\n', result);
+      alert(`代理测试结果:\n\n${result}`);
+    } catch (error) {
+      console.error('代理测试失败:', error);
+      setToast({
+        message: `代理测试失败: ${error}`,
+        type: 'error',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -164,6 +191,22 @@ export function ProxySettings({ setToast, onChange }: ProxySettingsProps) {
             </p>
           </div>
         </div>
+
+        {/* 代理测试按钮 */}
+        {settings.enabled && (
+          <div className="pt-4 border-t">
+            <Button
+              onClick={testProxyConnection}
+              variant="outline"
+              className="w-full"
+            >
+              测试代理连接
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2 text-center">
+              点击测试当前代理设置是否能正常连接到API服务
+            </p>
+          </div>
+        )}
 
       </div>
     </div>

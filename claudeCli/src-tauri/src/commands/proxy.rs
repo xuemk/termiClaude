@@ -153,3 +153,103 @@ pub fn apply_proxy_settings(settings: &ProxySettings) {
         }
     }
 }
+
+/// Test proxy connection to verify if proxy settings work
+#[tauri::command]
+pub async fn test_proxy_connection(settings: ProxySettings) -> Result<String, String> {
+    log::info!("Testing proxy connection with settings: {:?}", settings);
+    
+    if !settings.enabled {
+        return Ok("代理已禁用，无需测试".to_string());
+    }
+    
+    // 临时应用代理设置
+    apply_proxy_settings(&settings);
+    
+    // 创建HTTP客户端使用代理设置
+    let mut client_builder = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10));
+    
+    // 设置代理
+    if let Some(https_proxy_url) = &settings.https_proxy {
+        match reqwest::Proxy::https(https_proxy_url) {
+            Ok(proxy) => {
+                client_builder = client_builder.proxy(proxy);
+                log::info!("Added HTTPS proxy: {}", https_proxy_url);
+            },
+            Err(e) => {
+                return Err(format!("HTTPS代理URL格式错误: {}", e));
+            }
+        }
+    }
+    
+    if let Some(http_proxy_url) = &settings.http_proxy {
+        match reqwest::Proxy::http(http_proxy_url) {
+            Ok(proxy) => {
+                client_builder = client_builder.proxy(proxy);
+                log::info!("Added HTTP proxy: {}", http_proxy_url);
+            },
+            Err(e) => {
+                return Err(format!("HTTP代理URL格式错误: {}", e));
+            }
+        }
+    }
+    
+    if let Some(all_proxy_url) = &settings.all_proxy {
+        match reqwest::Proxy::all(all_proxy_url) {
+            Ok(proxy) => {
+                client_builder = client_builder.proxy(proxy);
+                log::info!("Added ALL proxy: {}", all_proxy_url);
+            },
+            Err(e) => {
+                return Err(format!("ALL代理URL格式错误: {}", e));
+            }
+        }
+    }
+    
+    let client = client_builder.build().map_err(|e| {
+        format!("创建HTTP客户端失败: {}", e)
+    })?;
+    
+    // 测试连接多个目标
+    let test_urls = vec![
+        ("检测IP", "https://httpbin.org/ip"),
+        ("Anthropic API", "https://api.anthropic.com/v1"),
+        ("OpenAI API", "https://api.openai.com/v1"),
+        ("anyrouter.top", "https://anyrouter.top"),
+    ];
+    
+    let mut results = Vec::new();
+    
+    for (name, url) in test_urls {
+        log::info!("Testing connection to: {} ({})", name, url);
+        match client.get(url).send().await {
+            Ok(response) => {
+                let status = response.status();
+                let success = status.is_success() || status.as_u16() == 401 || status.as_u16() == 403;
+                
+                if success {
+                    results.push(format!("✅ {}: 连接成功 ({})", name, status));
+                } else {
+                    results.push(format!("⚠️ {}: HTTP {} (可能需要认证)", name, status));
+                }
+                log::info!("Response from {} ({}): {}", name, url, status);
+            },
+            Err(e) => {
+                results.push(format!("❌ {}: 连接失败 - {}", name, e));
+                log::error!("Failed to connect to {} ({}): {}", name, url, e);
+            }
+        }
+    }
+    
+    let result_text = format!(
+        "代理测试结果:\n\n{}\n\n当前代理配置:\n- HTTP: {:?}\n- HTTPS: {:?}\n- ALL: {:?}\n- NO_PROXY: {:?}",
+        results.join("\n"),
+        settings.http_proxy,
+        settings.https_proxy, 
+        settings.all_proxy,
+        settings.no_proxy
+    );
+    
+    Ok(result_text)
+}

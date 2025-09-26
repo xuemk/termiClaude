@@ -650,12 +650,12 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
             // 更新localStorage，确保前端和后端状态一致
             localStorage.setItem('selected-model', mid1Var.value.trim());
             logger.info(`🔄 Updated localStorage selected-model to: ${mid1Var.value.trim()}`);
-            
+      
             // 同时调用updateClaudeSettingsWithModel确保完全同步
-            try {
+        try {
               await api.updateClaudeSettingsWithModel(mid1Var.value.trim());
               logger.info(`🎯 Synchronized model selection to: ${mid1Var.value.trim()}`);
-            } catch (error) {
+        } catch (error) {
               logger.error("Failed to sync model selection:", error);
             }
           } else {
