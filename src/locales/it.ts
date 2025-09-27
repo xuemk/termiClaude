@@ -242,6 +242,23 @@ export const it: Translations = {
     testAudioDesc: "Testa riproduzione notifica audio",
     playTestSound: "Riproduci Suono Test",
 
+    // Popup notification settings (English placeholder for Italian)
+    popupNotifications: "Popup Notifications",
+    popupNotificationsDesc: "Configure popup notifications that appear in the corner when tasks complete",
+    popupNotificationMode: "Popup Mode",
+    popupNotificationModeDesc: "Choose when to show popup notifications",
+    popupModeOff: "Off",
+    popupModeOnMessage: "On Message Complete",
+    popupModeOnQueue: "On Queue Complete",
+    popupModeOffDesc: "No popup notifications",
+    popupModeOnMessageDesc: "Show popup when each message task completes",
+    popupModeOnQueueDesc: "Show popup when all queued tasks complete",
+    showOnlyWhenUnfocused: "Only show when window is unfocused",
+    showOnlyWhenUnfocusedDesc: "Popup will only appear when the application window doesn't have focus",
+    testPopup: "Test Popup",
+    testPopupDesc: "Test popup notification display",
+    playTestPopup: "Show Test Popup",
+
     userHooks: "Hook utente",
     userHooksDesc:
       "Configura hook che si applicano a tutte le sessioni Claude Code per il tuo account utente. Questi sono memorizzati in ~/.claude/settings.json",

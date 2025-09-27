@@ -45,7 +45,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useI18n } from "@/lib/i18n";
 import { logger } from "@/lib/logger";
 import { handleError, handleApiError, handleValidationError } from "@/lib/errorHandler";
-import { audioNotificationManager } from "@/lib/audioNotification";
+import { notificationManager } from "@/lib/notificationManager";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking, useMessageDisplayMode } from "@/hooks";
 // import { createDebouncedUpdater } from "@/lib/streamOptimization";
 interface ClaudeCodeSessionProps {
@@ -1378,12 +1378,12 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             }
           }
 
-          // Trigger audio notification for message completion
+          // Trigger notifications for message completion
           if (success) {
             try {
-              await audioNotificationManager.onMessageComplete();
+              await notificationManager.onMessageComplete();
             } catch (err) {
-              logger.error("Failed to play message completion audio:", err);
+              logger.error("Failed to trigger message completion notifications:", err);
             }
           }
 
@@ -1400,9 +1400,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             // All queued prompts completed - trigger queue completion notification
             if (success) {
               try {
-                await audioNotificationManager.onQueueComplete();
+                await notificationManager.onQueueComplete();
               } catch (err) {
-                logger.error("Failed to play queue completion audio:", err);
+                logger.error("Failed to trigger queue completion notifications:", err);
               }
             }
           }

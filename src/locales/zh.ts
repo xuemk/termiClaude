@@ -240,6 +240,23 @@ export const zh: Translations = {
     testAudioDesc: "测试音频通知播放",
     playTestSound: "播放测试音频",
 
+    // 弹框通知设置
+    popupNotifications: "弹框通知",
+    popupNotificationsDesc: "配置任务完成时显示在角落的弹框通知",
+    popupNotificationMode: "弹框模式",
+    popupNotificationModeDesc: "选择何时显示弹框通知",
+    popupModeOff: "关闭",
+    popupModeOnMessage: "消息完成时",
+    popupModeOnQueue: "队列完成时", 
+    popupModeOffDesc: "不显示弹框通知",
+    popupModeOnMessageDesc: "每条消息任务完成时显示弹框",
+    popupModeOnQueueDesc: "所有排队任务完成时显示弹框",
+    showOnlyWhenUnfocused: "仅在窗口失焦时显示",
+    showOnlyWhenUnfocusedDesc: "只有当应用程序窗口没有焦点时才显示弹框",
+    testPopup: "测试弹框",
+    testPopupDesc: "测试弹框通知显示",
+    playTestPopup: "显示测试弹框",
+
     userHooks: "用户钩子",
     userHooksDesc:
       "配置适用于您用户账户的所有 Claude Code 会话的钩子。这些存储在 ~/.claude/settings.json 中",

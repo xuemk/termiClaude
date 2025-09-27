@@ -46,6 +46,14 @@ import {
   type AudioNotificationConfig,
   type AudioNotificationMode
 } from "@/lib/audioNotification";
+import {
+  popupNotificationManager,
+  loadPopupConfigFromLocalStorage,
+  savePopupConfigToLocalStorage,
+  type PopupNotificationConfig,
+  type PopupNotificationMode
+} from "@/lib/popupNotification";
+import { notificationManager } from "@/lib/notificationManager";
 import { fontScaleManager, FONT_SCALE_OPTIONS, type FontScale } from "@/lib/fontScale";
 interface SettingsProps {
   /**
@@ -111,6 +119,10 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
   // Audio notification state
   const [audioConfig, setAudioConfig] = useState<AudioNotificationConfig>({ mode: "off" });
   const [audioConfigChanged, setAudioConfigChanged] = useState(false);
+
+  // Popup notification state
+  const [popupConfig, setPopupConfig] = useState<PopupNotificationConfig>({ mode: "off", showOnlyWhenUnfocused: true });
+  const [popupConfigChanged, setPopupConfigChanged] = useState(false);
 
   // Font scale state
   const [fontScale, setFontScale] = useState<FontScale>(fontScaleManager.getCurrentScale());
@@ -316,6 +328,19 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
         audioNotificationManager.setConfig(defaultConfig);
       }
 
+      // Load popup notification config from localStorage
+      try {
+        const popupConfig = loadPopupConfigFromLocalStorage();
+        setPopupConfig(popupConfig);
+        popupNotificationManager.updateConfig(popupConfig);
+        logger.debug("Popup config loaded from localStorage:", popupConfig);
+      } catch (error) {
+        logger.error("Failed to load popup config, using defaults:", error);
+        const defaultConfig: PopupNotificationConfig = { mode: "off", showOnlyWhenUnfocused: true };
+        setPopupConfig(defaultConfig);
+        popupNotificationManager.updateConfig(defaultConfig);
+      }
+
       // Load font scale
       setFontScale(fontScaleManager.getCurrentScale());
       setCustomMultiplierInput(fontScaleManager.getCustomMultiplier().toString());
@@ -430,6 +455,18 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
           logger.debug("Audio config saved successfully to localStorage");
         } catch (error) {
           logger.error("Failed to save audio config:", error);
+        }
+      }
+
+      // Save popup notification config to localStorage
+      if (popupConfigChanged) {
+        try {
+          savePopupConfigToLocalStorage(popupConfig);
+          popupNotificationManager.updateConfig(popupConfig);
+          setPopupConfigChanged(false);
+          logger.debug("Popup config saved successfully to localStorage");
+        } catch (error) {
+          logger.error("Failed to save popup config:", error);
         }
       }
 
@@ -1887,7 +1924,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                             size="sm"
                             onClick={async () => {
                               try {
-                                await audioNotificationManager.testNotification();
+                                await notificationManager.testAudioNotification();
                               } catch (error) {
                                 logger.error("Failed to test audio notification:", error);
                               }
@@ -1896,6 +1933,109 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                           >
                             🔊 {t.settings.playTestSound}
                           </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Popup Notifications */}
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-sm font-medium">{t.settings.popupNotifications}</Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {t.settings.popupNotificationsDesc}
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="popupMode" className="text-sm">
+                            {t.settings.popupNotificationMode}
+                          </Label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {t.settings.popupNotificationModeDesc}
+                          </p>
+                          <div className="space-y-2">
+                            {[
+                              { value: "off", label: t.settings.popupModeOff, desc: t.settings.popupModeOffDesc },
+                              { value: "on_message", label: t.settings.popupModeOnMessage, desc: t.settings.popupModeOnMessageDesc },
+                              { value: "on_queue", label: t.settings.popupModeOnQueue, desc: t.settings.popupModeOnQueueDesc },
+                            ].map((option) => (
+                              <div key={option.value} className="flex items-start space-x-3">
+                                <input
+                                  type="radio"
+                                  id={`popup-${option.value}`}
+                                  name="popupMode"
+                                  value={option.value}
+                                  checked={popupConfig.mode === option.value}
+                                  onChange={(e) => {
+                                    setPopupConfig({ ...popupConfig, mode: e.target.value as PopupNotificationMode });
+                                    setPopupConfigChanged(true);
+                                  }}
+                                  className="mt-1"
+                                />
+                                <div className="flex-1">
+                                  <Label htmlFor={`popup-${option.value}`} className="text-sm font-medium">
+                                    {option.label}
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground">{option.desc}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              id="showOnlyWhenUnfocused"
+                              checked={popupConfig.showOnlyWhenUnfocused}
+                              onChange={(e) => {
+                                setPopupConfig({ ...popupConfig, showOnlyWhenUnfocused: e.target.checked });
+                                setPopupConfigChanged(true);
+                              }}
+                            />
+                            <div className="flex-1">
+                              <Label htmlFor="showOnlyWhenUnfocused" className="text-sm font-medium">
+                                {t.settings.showOnlyWhenUnfocused}
+                              </Label>
+                              <p className="text-xs text-muted-foreground">{t.settings.showOnlyWhenUnfocusedDesc}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <Label className="text-sm">{t.settings.testPopup}</Label>
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {t.settings.testPopupDesc}
+                          </p>
+                          <div className="flex gap-2 items-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={async () => {
+                                try {
+                                  await notificationManager.testPopupNotification();
+                                  setToast({ message: "测试通知已发送！如果没有看到通知，请检查系统通知权限设置。", type: "success" });
+                                } catch (error) {
+                                  logger.error("Failed to test popup notification:", error);
+                                  const errorMessage = error instanceof Error ? error.message : "测试通知失败";
+                                  setToast({ message: errorMessage, type: "error" });
+                                }
+                              }}
+                              className="gap-2"
+                            >
+                              💬 {t.settings.playTestPopup}
+                            </Button>
+                            <div className="text-xs text-muted-foreground">
+                              窗口焦点状态: {notificationManager.getCurrentFocusState() ? "有焦点" : "无焦点"}
+                            </div>
+                          </div>
+                          
+                          <div className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded border mt-2">
+                            💡 提示：点击测试按钮后，系统可能会询问是否允许通知。请点击"允许"以启用弹框功能。
+                            弹框只在窗口失去焦点时显示（除了测试功能）。
+                          </div>
                         </div>
                       </div>
                     </div>

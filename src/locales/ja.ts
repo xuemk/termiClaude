@@ -238,6 +238,23 @@ export const ja: Translations = {
     testAudioDesc: "オーディオ通知の再生をテスト",
     playTestSound: "テスト音を再生",
 
+    // Popup notification settings (English placeholder for Japanese)
+    popupNotifications: "Popup Notifications",
+    popupNotificationsDesc: "Configure popup notifications that appear in the corner when tasks complete",
+    popupNotificationMode: "Popup Mode",
+    popupNotificationModeDesc: "Choose when to show popup notifications",
+    popupModeOff: "Off",
+    popupModeOnMessage: "On Message Complete",
+    popupModeOnQueue: "On Queue Complete",
+    popupModeOffDesc: "No popup notifications",
+    popupModeOnMessageDesc: "Show popup when each message task completes",
+    popupModeOnQueueDesc: "Show popup when all queued tasks complete",
+    showOnlyWhenUnfocused: "Only show when window is unfocused",
+    showOnlyWhenUnfocusedDesc: "Popup will only appear when the application window doesn't have focus",
+    testPopup: "Test Popup",
+    testPopupDesc: "Test popup notification display",
+    playTestPopup: "Show Test Popup",
+
     userHooks: "ユーザーフック",
     userHooksDesc:
       "ユーザーアカウントのすべてのClaude Codeセッションに適用されるフックを設定します。これらは~/.claude/settings.jsonに保存されます",

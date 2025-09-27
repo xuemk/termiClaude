@@ -275,6 +275,23 @@ export interface Translations {
     testAudioDesc: string;
     playTestSound: string;
 
+    // 弹框通知设置
+    popupNotifications: string;
+    popupNotificationsDesc: string;
+    popupNotificationMode: string;
+    popupNotificationModeDesc: string;
+    popupModeOff: string;
+    popupModeOnMessage: string;
+    popupModeOnQueue: string;
+    popupModeOffDesc: string;
+    popupModeOnMessageDesc: string;
+    popupModeOnQueueDesc: string;
+    showOnlyWhenUnfocused: string;
+    showOnlyWhenUnfocusedDesc: string;
+    testPopup: string;
+    testPopupDesc: string;
+    playTestPopup: string;
+
     // Hooks设置
     userHooks: string;
     userHooksDesc: string;

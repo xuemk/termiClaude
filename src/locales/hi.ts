@@ -239,6 +239,23 @@ export const hi: Translations = {
     testAudioDesc: "ऑडियो अधिसूचना प्लेबैक का परीक्षण करें",
     playTestSound: "परीक्षण ध्वनि चलाएं",
 
+    // Popup notification settings (English placeholder for Hindi)
+    popupNotifications: "Popup Notifications",
+    popupNotificationsDesc: "Configure popup notifications that appear in the corner when tasks complete",
+    popupNotificationMode: "Popup Mode",
+    popupNotificationModeDesc: "Choose when to show popup notifications",
+    popupModeOff: "Off",
+    popupModeOnMessage: "On Message Complete",
+    popupModeOnQueue: "On Queue Complete",
+    popupModeOffDesc: "No popup notifications",
+    popupModeOnMessageDesc: "Show popup when each message task completes",
+    popupModeOnQueueDesc: "Show popup when all queued tasks complete",
+    showOnlyWhenUnfocused: "Only show when window is unfocused",
+    showOnlyWhenUnfocusedDesc: "Popup will only appear when the application window doesn't have focus",
+    testPopup: "Test Popup",
+    testPopupDesc: "Test popup notification display",
+    playTestPopup: "Show Test Popup",
+
     userHooks: "उपयोगकर्ता हुक्स",
     userHooksDesc:
       "हुक्स कॉन्फ़िगर करें जो आपके उपयोगकर्ता खाते के सभी Claude Code सेशन पर लागू होते हैं। ये ~/.claude/settings.json में संग्रहीत हैं",

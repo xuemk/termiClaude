@@ -243,6 +243,23 @@ export const ru: Translations = {
     testAudioDesc: "Тестировать воспроизведение аудио уведомления",
     playTestSound: "Воспроизвести Тестовый Звук",
 
+    // Popup notification settings (English placeholder for Russian)
+    popupNotifications: "Popup Notifications",
+    popupNotificationsDesc: "Configure popup notifications that appear in the corner when tasks complete",
+    popupNotificationMode: "Popup Mode",
+    popupNotificationModeDesc: "Choose when to show popup notifications",
+    popupModeOff: "Off",
+    popupModeOnMessage: "On Message Complete",
+    popupModeOnQueue: "On Queue Complete",
+    popupModeOffDesc: "No popup notifications",
+    popupModeOnMessageDesc: "Show popup when each message task completes",
+    popupModeOnQueueDesc: "Show popup when all queued tasks complete",
+    showOnlyWhenUnfocused: "Only show when window is unfocused",
+    showOnlyWhenUnfocusedDesc: "Popup will only appear when the application window doesn't have focus",
+    testPopup: "Test Popup",
+    testPopupDesc: "Test popup notification display",
+    playTestPopup: "Show Test Popup",
+
     userHooks: "Пользовательские хуки",
     userHooksDesc:
       "Настройка хуков, которые применяются ко всем сессиям Claude Code для вашей учетной записи. Они хранятся в ~/.claude/settings.json",

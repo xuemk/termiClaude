@@ -238,6 +238,23 @@ export const ko: Translations = {
     testAudioDesc: "오디오 알림 재생 테스트",
     playTestSound: "테스트 소리 재생",
 
+    // Popup notification settings (English placeholder for Korean)
+    popupNotifications: "Popup Notifications",
+    popupNotificationsDesc: "Configure popup notifications that appear in the corner when tasks complete",
+    popupNotificationMode: "Popup Mode",
+    popupNotificationModeDesc: "Choose when to show popup notifications",
+    popupModeOff: "Off",
+    popupModeOnMessage: "On Message Complete",
+    popupModeOnQueue: "On Queue Complete",
+    popupModeOffDesc: "No popup notifications",
+    popupModeOnMessageDesc: "Show popup when each message task completes",
+    popupModeOnQueueDesc: "Show popup when all queued tasks complete",
+    showOnlyWhenUnfocused: "Only show when window is unfocused",
+    showOnlyWhenUnfocusedDesc: "Popup will only appear when the application window doesn't have focus",
+    testPopup: "Test Popup",
+    testPopupDesc: "Test popup notification display",
+    playTestPopup: "Show Test Popup",
+
     userHooks: "사용자 훅",
     userHooksDesc:
       "사용자 계정의 모든 Claude Code 세션에 적용되는 훅을 구성합니다. 이는 ~/.claude/settings.json에 저장됩니다",

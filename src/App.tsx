@@ -30,7 +30,8 @@ import { useTabState } from "@/hooks/useTabState";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { handleApiError } from "@/lib/errorHandler";
 import { logger } from "@/lib/logger";
-import { audioNotificationManager, loadAudioConfigFromLocalStorage } from "@/lib/audioNotification";
+// Audio notification functionality is now handled by the unified NotificationManager
+import { notificationManager } from "@/lib/notificationManager";
 import { useConfigMonitor } from "@/hooks/useConfigMonitor";
 
 import { useAppLifecycle } from "@/hooks";
@@ -102,6 +103,12 @@ function AppContent() {
   // Initialize app lifecycle
   useAppLifecycle();
 
+  // Initialize notification manager
+  useEffect(() => {
+    notificationManager.initializePopupNotifications();
+    logger.debug("Notification manager initialized");
+  }, []);
+
   // Show config dialog when refresh is needed
   useEffect(() => {
     if (status && status.needs_refresh) {
@@ -126,22 +133,7 @@ function AppContent() {
     clearStatus();
   };
 
-  // Initialize audio notification manager on app start
-  useEffect(() => {
-    const initializeAudioNotifications = () => {
-      try {
-        // Load audio config from localStorage (independent of Claude settings)
-        const audioConfig = loadAudioConfigFromLocalStorage();
-        audioNotificationManager.setConfig(audioConfig);
-        logger.debug("Audio notifications initialized:", audioConfig);
-      } catch (error) {
-        // Silently fail if config can't be loaded - use default config
-        logger.warn("Failed to load audio notification settings:", error);
-      }
-    };
-
-    initializeAudioNotifications();
-  }, []);
+  // Note: Audio notification initialization is now handled by the unified NotificationManager
 
   // Initialize performance optimizations on app start
   useEffect(() => {

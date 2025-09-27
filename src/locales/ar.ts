@@ -236,6 +236,23 @@ export const ar: Translations = {
     testAudioDesc: "اختبار تشغيل الإشعار الصوتي",
     playTestSound: "تشغيل صوت الاختبار",
 
+    // Popup notification settings (English placeholder for Arabic)
+    popupNotifications: "Popup Notifications",
+    popupNotificationsDesc: "Configure popup notifications that appear in the corner when tasks complete",
+    popupNotificationMode: "Popup Mode",
+    popupNotificationModeDesc: "Choose when to show popup notifications",
+    popupModeOff: "Off",
+    popupModeOnMessage: "On Message Complete",
+    popupModeOnQueue: "On Queue Complete",
+    popupModeOffDesc: "No popup notifications",
+    popupModeOnMessageDesc: "Show popup when each message task completes",
+    popupModeOnQueueDesc: "Show popup when all queued tasks complete",
+    showOnlyWhenUnfocused: "Only show when window is unfocused",
+    showOnlyWhenUnfocusedDesc: "Popup will only appear when the application window doesn't have focus",
+    testPopup: "Test Popup",
+    testPopupDesc: "Test popup notification display",
+    playTestPopup: "Show Test Popup",
+
     userHooks: "خطافات المستخدم",
     userHooksDesc:
       "تكوين الخطافات التي تنطبق على جميع جلسات Claude Code لحساب المستخدم الخاص بك. يتم تخزينها في ~/.claude/settings.json",
