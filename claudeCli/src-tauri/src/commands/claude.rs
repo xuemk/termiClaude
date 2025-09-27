@@ -654,6 +654,15 @@ pub async fn get_project_sessions(project_id: String) -> Result<Vec<Session>, St
                 // Extract first user message and timestamp
                 let (first_message, message_timestamp) = extract_first_user_message(&path);
 
+                // Skip sessions that don't have a first user message (likely invalid/unresumable)
+                if first_message.is_none() {
+                    log::warn!(
+                        "Skipping session without first user message (unresumable): {:?}",
+                        path.file_name().unwrap_or_default()
+                    );
+                    continue;
+                }
+
                 // Try to load associated todo data
                 let todo_path = todos_dir.join(format!("{}.json", session_id));
                 let todo_data = if todo_path.exists() {
@@ -681,7 +690,7 @@ pub async fn get_project_sessions(project_id: String) -> Result<Vec<Session>, St
     sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
     log::info!(
-        "Found {} sessions for project {}",
+        "Found {} resumable sessions (filtered) for project {}",
         sessions.len(),
         project_id
     );
