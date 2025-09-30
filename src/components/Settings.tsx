@@ -146,6 +146,12 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
 
   // Message display mode state
   const [messageDisplayMode, setMessageDisplayMode] = useState<'both' | 'tool_calls_only'>('both');
+  
+  // Prompt input always visible state
+  const [promptInputAlwaysVisible, setPromptInputAlwaysVisible] = useState(() => {
+    const saved = localStorage.getItem('prompt-input-always-visible');
+    return saved === 'true';
+  });
   // 重新加载环境分组状态（用于实时同步）
   const reloadEnvironmentGroups = useCallback(async () => {
     try {
@@ -1198,6 +1204,28 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                           id="verbose"
                           checked={settings?.verbose === true}
                           onCheckedChange={(checked) => updateSetting("verbose", checked)}
+                        />
+                      </div>
+
+                      {/* Prompt Input Always Visible */}
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5 flex-1">
+                          <Label htmlFor="prompt-always-visible">输入框常驻显示</Label>
+                          <p className="text-xs text-muted-foreground">
+                            开启后输入框将始终显示，关闭则鼠标移开后自动隐藏
+                          </p>
+                        </div>
+                        <Switch
+                          id="prompt-always-visible"
+                          checked={promptInputAlwaysVisible}
+                          onCheckedChange={(checked) => {
+                            setPromptInputAlwaysVisible(checked);
+                            localStorage.setItem('prompt-input-always-visible', checked.toString());
+                            // Dispatch event to notify FloatingPromptInput
+                            window.dispatchEvent(new CustomEvent('prompt-visibility-changed', { 
+                              detail: { alwaysVisible: checked } 
+                            }));
+                          }}
                         />
                       </div>
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
   Terminal,
   FolderOpen,
   Copy,
@@ -13,6 +12,8 @@ import {
   Hash,
   Command,
   RefreshCw,
+  Brain,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +133,14 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const [selectedEnvGroup, setSelectedEnvGroup] = useState<number | null>(null);
   const [loadingEnvGroups, setLoadingEnvGroups] = useState(false);
 
+  // 模型和思考模式状态
+  const [availableModels, setAvailableModels] = useState<{ id: ClaudeModel; name: string; description?: string }[]>([]);
+  const [selectedModel, setSelectedModel] = useState<ClaudeModel>("sonnet-3-5");
+  const [loadingModels, setLoadingModels] = useState(false);
+  
+  // Thinking mode type definition (matching FloatingPromptInput)
+  type ThinkingMode = "auto" | "think" | "think_hard" | "think_harder" | "ultrathink";
+  const [selectedThinkingMode, setSelectedThinkingMode] = useState<ThinkingMode>("auto");
 
   // Queued prompts state
   const [queuedPrompts, setQueuedPrompts] = useState<
@@ -206,6 +215,34 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   // Get message display mode
   const { mode: messageDisplayMode } = useMessageDisplayMode();
 
+  // 加载可用模型
+  const loadAvailableModels = useCallback(async () => {
+    try {
+      setLoadingModels(true);
+      const models = await api.getAvailableModels();
+      const formattedModels = models.map(m => ({
+        id: m.id as ClaudeModel,
+        name: m.name,
+        description: m.description
+      }));
+      setAvailableModels(formattedModels);
+      
+      // 从 localStorage 加载上次选择的模型
+      const savedModel = localStorage.getItem('selected-model');
+      if (savedModel && formattedModels.find(m => m.id === savedModel)) {
+        setSelectedModel(savedModel as ClaudeModel);
+      } else if (formattedModels.length > 0) {
+        setSelectedModel(formattedModels[0].id);
+      }
+      
+      logger.debug(`Loaded ${formattedModels.length} models`);
+    } catch (error) {
+      logger.error("Failed to load available models:", error);
+    } finally {
+      setLoadingModels(false);
+    }
+  }, []);
+
   // 加载环境分组
   const loadEnvironmentGroups = useCallback(async () => {
     try {
@@ -246,13 +283,16 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         }
       }
       
+      // 加载环境分组后，重新加载模型列表
+      await loadAvailableModels();
+      
       logger.debug(`Loaded ${groups.length} environment groups, selected: ${enabledGroup?.name || 'none'}`);
     } catch (error) {
       logger.error("Failed to load environment groups:", error);
     } finally {
       setLoadingEnvGroups(false);
     }
-  }, [projectPath]);
+  }, [projectPath, loadAvailableModels]);
 
   // 监听环境变量更新和刷新事件
   useEffect(() => {
@@ -265,7 +305,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     };
     
     window.addEventListener('environment-groups-updated', handleEnvUpdate);
-    return () => window.removeEventListener('environment-groups-updated', handleEnvUpdate);
+    
+    return () => {
+      window.removeEventListener('environment-groups-updated', handleEnvUpdate);
+    };
   }, [loadEnvironmentGroups]);
 
   // Helper function to extract text content from various content formats
@@ -1048,16 +1091,6 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     }
     
     return summary;
-  }, []);
-
-  /**
-   * Handle model change from FloatingPromptInput
-   */
-  const handleModelChange = useCallback((newModel: ClaudeModel, oldModel: ClaudeModel) => {
-    if (newModel !== oldModel) {
-      logger.info(`[ClaudeCodeSession] Model switched within same environment: ${oldModel} → ${newModel}`);
-      // 同一分组内的模型切换不需要特殊处理，直接允许resume
-    }
   }, []);
 
   /**
@@ -2045,7 +2078,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     <motion.div
       ref={parentRef}
       className={cn(
-        "flex-1 overflow-y-auto relative pb-40",
+        "flex-1 overflow-y-auto relative pb-32",
         "virtual-container optimized-scroll"
       )}
       style={{
@@ -2053,7 +2086,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       }}
     >
       <motion.div
-        className="relative w-full mx-auto px-2 pt-8 pb-4"
+        className="relative w-full mx-auto px-2 pt-8 pb-8"
         style={{
           height: `${Math.max(rowVirtualizer.getTotalSize(), 100)}px`,
           minHeight: "100px",
@@ -2165,8 +2198,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           className="flex items-center justify-between p-2 border-b border-border bg-background/50 backdrop-blur-sm h-12"
         >
           <motion.div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" onClick={onBack} className="h-6 w-6">
-              <ArrowLeft className="h-3 w-3" />
+            <Button variant="ghost" size="icon" onClick={onBack} className="h-6 w-6" title="关闭当前标签页">
+              <X className="h-3 w-3" />
             </Button>
             <motion.div className="flex items-center gap-2">
               <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
@@ -2179,17 +2212,17 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             </motion.div>
           </motion.div>
 
-          {/* 环境分组选择和命令栏 */}
+          {/* 模型选择栏 */}
           <motion.div className="flex items-center gap-1">
-            {/* 环境分组下拉框 */}
+            {/* 供应商（环境分组）下拉框 */}
             {projectPath && envGroups.length > 0 && (
               <Select 
                 value={selectedEnvGroup?.toString() || ""} 
                 onValueChange={handleEnvGroupChange}
                 disabled={isLoading || loadingEnvGroups}
               >
-                <SelectTrigger className="h-6 w-32 text-xs">
-                  <SelectValue placeholder="选择环境" />
+                <SelectTrigger className="h-6 w-28 text-xs">
+                  <SelectValue placeholder="供应商" />
                 </SelectTrigger>
                 <SelectContent>
                   {envGroups.map((group) => (
@@ -2199,10 +2232,78 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                           "w-2 h-2 rounded-full",
                           group.enabled ? "bg-green-500" : "bg-gray-400"
                         )} />
-                        {group.name}
+                        <span className="truncate">{group.name}</span>
                       </div>
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            )}
+            
+            {/* 模型下拉框 */}
+            {projectPath && availableModels.length > 0 && (
+              <Select 
+                value={selectedModel} 
+                onValueChange={(value) => {
+                  setSelectedModel(value as ClaudeModel);
+                  localStorage.setItem('selected-model', value);
+                  logger.info(`Model selected: ${value}`);
+                }}
+                disabled={isLoading || loadingModels}
+              >
+                <SelectTrigger className="h-6 w-36 text-xs">
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  <SelectValue placeholder="选择模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="truncate">{model.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            
+            {/* 思考模式下拉框 */}
+            {projectPath && (
+              <Select 
+                value={selectedThinkingMode} 
+                onValueChange={(value) => setSelectedThinkingMode(value as ThinkingMode)}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="h-6 w-28 text-xs">
+                  <Brain className="h-3 w-3 mr-1" />
+                  <SelectValue placeholder="思考模式" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    <div className="flex items-center gap-2">
+                      <span>Auto</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="think">
+                    <div className="flex items-center gap-2">
+                      <span>Think</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="think_hard">
+                    <div className="flex items-center gap-2">
+                      <span>Think Hard</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="think_harder">
+                    <div className="flex items-center gap-2">
+                      <span>Think Harder</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="ultrathink">
+                    <div className="flex items-center gap-2">
+                      <span>Ultrathink</span>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -2294,7 +2395,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         {/* Main Content Area */}
         <motion.div
           className={cn(
-            "flex-1 overflow-hidden transition-all duration-300",
+            "flex-1 overflow-hidden transition-all duration-300 relative",
             showTimeline && "sm:mr-96"
           )}
         >
@@ -2501,10 +2602,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             ref={floatingPromptRef}
             onSend={handleSendPrompt}
             onCancel={handleCancelExecution}
-            onModelChange={handleModelChange}
             isLoading={isLoading}
             disabled={!projectPath}
             projectPath={projectPath}
+            defaultModel={selectedModel}
             className={cn(
               showTimeline && "sm:right-96"
             )}

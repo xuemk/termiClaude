@@ -401,11 +401,8 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
             session={tab.sessionData as Session} // Pass the full session object if available
             initialProjectPath={tab.initialProjectPath || (tab.sessionData as Session)?.project_path || ""}
             onBack={() => {
-              // Go back to projects view in the same tab
-              updateTab(tab.id, {
-                type: "projects",
-                title: t.projects.title,
-              });
+              // Close current tab and return to parent tab (if exists) or previous tab in navigation history
+              closeTab(tab.id);
             }}
           />
         );

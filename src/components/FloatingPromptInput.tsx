@@ -1,11 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Maximize2, Minimize2, ChevronUp, Sparkles, Square, Brain } from "lucide-react";
+import { Send, Maximize2, Minimize2, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Popover } from "@/components/ui/popover";
 import { ResizableTextarea } from "@/components/ui/resizable-textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { FilePicker } from "./FilePicker";
 import { SlashCommandPicker } from "./SlashCommandPicker";
 import { ImagePreview } from "./ImagePreview";
@@ -48,87 +46,13 @@ interface FloatingPromptInputProps {
    * Callback when cancel is clicked (only during loading)
    */
   onCancel?: () => void;
-  /**
-   * Callback when model is changed (for context handling)
-   */
-  onModelChange?: (newModel: ClaudeModel, oldModel: ClaudeModel) => void;
 }
 
 export interface FloatingPromptInputRef {
   addImage: (imagePath: string) => void;
 }
 
-/**
- * Thinking mode type definition
- */
-type ThinkingMode = "auto" | "think" | "think_hard" | "think_harder" | "ultrathink";
 
-/**
- * Thinking mode configuration
- */
-type ThinkingModeConfig = {
-  id: ThinkingMode;
-  name: string;
-  description: string;
-  level: number; // 0-4 for visual indicator
-  phrase?: string; // The phrase to append
-};
-
-const THINKING_MODES: ThinkingModeConfig[] = [
-  {
-    id: "auto",
-    name: "Auto",
-    description: "Let Claude decide",
-    level: 0,
-  },
-  {
-    id: "think",
-    name: "Think",
-    description: "Basic reasoning",
-    level: 1,
-    phrase: "think",
-  },
-  {
-    id: "think_hard",
-    name: "Think Hard",
-    description: "Deeper analysis",
-    level: 2,
-    phrase: "think hard",
-  },
-  {
-    id: "think_harder",
-    name: "Think Harder",
-    description: "Extensive reasoning",
-    level: 3,
-    phrase: "think harder",
-  },
-  {
-    id: "ultrathink",
-    name: "Ultrathink",
-    description: "Maximum computation",
-    level: 4,
-    phrase: "ultrathink",
-  },
-];
-
-/**
- * ThinkingModeIndicator component - Shows visual indicator bars for thinking level
- */
-const ThinkingModeIndicator: React.FC<{ level: number }> = ({ level }) => {
-  return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4].map((i) => (
-        <div
-          key={i}
-          className={cn(
-            "w-1 h-3 rounded-full transition-colors",
-            i <= level ? "bg-blue-500" : "bg-muted"
-          )}
-        />
-      ))}
-    </div>
-  );
-};
 
 type Model = {
   id: ClaudeModel;
@@ -192,7 +116,6 @@ const FloatingPromptInputInner = (
     projectPath,
     className,
     onCancel,
-    onModelChange,
   }: FloatingPromptInputProps,
   ref: React.Ref<FloatingPromptInputRef>
 ) => {
@@ -200,16 +123,18 @@ const FloatingPromptInputInner = (
 
   // State for dynamic models
   const [models, setModels] = useState<Model[]>([]);
-  const [modelsLoading, setModelsLoading] = useState(true);
 
   // State for smart visibility
   const [isVisible, setIsVisible] = useState(true);
+  const [alwaysVisible, setAlwaysVisible] = useState(() => {
+    const saved = localStorage.getItem('prompt-input-always-visible');
+    return saved === 'true';
+  });
   const visibilityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load available models from enabled environment variable groups
   const loadModels = useCallback(async () => {
     try {
-      setModelsLoading(true);
       logger.info("[FloatingPromptInput] Loading models from enabled environment variable groups...");
       const availableModels = await api.getAvailableModels();
 
@@ -222,7 +147,7 @@ const FloatingPromptInputInner = (
           id: modelInfo.id as ClaudeModel, // Cast to ClaudeModel for now
           name: modelInfo.name,
           description: modelInfo.description || `Model: ${modelInfo.id}`,
-          icon: <Sparkles className="h-4 w-4" />, // Default icon for all dynamic models
+          icon: <span className="text-primary">✨</span>, // Simple icon for models
         }));
 
         setModels(convertedModels);
@@ -235,8 +160,6 @@ const FloatingPromptInputInner = (
       logger.error("Failed to load available models:", error);
       // On error, keep empty models array
       setModels([]);
-    } finally {
-      setModelsLoading(false);
     }
   }, []);
 
@@ -268,8 +191,33 @@ const FloatingPromptInputInner = (
     };
   }, [loadModels]);
 
-  // Smart visibility effect - track mouse position
+  // Listen for prompt visibility setting changes
   useEffect(() => {
+    const handleVisibilityChange = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { alwaysVisible: newAlwaysVisible } = customEvent.detail;
+      setAlwaysVisible(newAlwaysVisible);
+      if (newAlwaysVisible) {
+        setIsVisible(true);
+      }
+    };
+
+    window.addEventListener('prompt-visibility-changed', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('prompt-visibility-changed', handleVisibilityChange);
+    };
+  }, []);
+
+
+
+  // Smart visibility effect - track mouse position (only when not always visible)
+  useEffect(() => {
+    // If always visible, keep it visible and don't track mouse
+    if (alwaysVisible) {
+      setIsVisible(true);
+      return;
+    }
+
     const handleMouseMove = (event: MouseEvent) => {
       const windowHeight = window.innerHeight;
       const currentMouseY = event.clientY;
@@ -306,7 +254,7 @@ const FloatingPromptInputInner = (
         clearTimeout(visibilityTimeoutRef.current);
       }
     };
-  }, []);
+  }, [alwaysVisible]);
 
   // Listen for environment refresh events
   useEffect(() => {
@@ -355,7 +303,6 @@ const FloatingPromptInputInner = (
       logger.error("Failed to update Claude settings.json with model:", error);
     }
   }, []);
-  const [selectedThinkingMode, setSelectedThinkingMode] = useState<ThinkingMode>("auto");
 
   // Set default model when models are loaded
   useEffect(() => {
@@ -390,8 +337,6 @@ const FloatingPromptInputInner = (
     }
   }, [models, defaultModel, updateModelInSettings]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [modelPickerOpen, setModelPickerOpen] = useState(false);
-  const [thinkingModePickerOpen, setThinkingModePickerOpen] = useState(false);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [filePickerQuery, setFilePickerQuery] = useState("");
   const [showSlashCommandPicker, setShowSlashCommandPicker] = useState(false);
@@ -623,13 +568,7 @@ const FloatingPromptInputInner = (
 
   const handleSend = () => {
     if (prompt.trim() && !disabled) {
-      let finalPrompt = prompt.trim();
-
-      // Append thinking phrase if not auto mode
-      const thinkingMode = THINKING_MODES.find((m) => m.id === selectedThinkingMode);
-      if (thinkingMode && thinkingMode.phrase) {
-        finalPrompt = `${finalPrompt}.\n\n${thinkingMode.phrase}.`;
-      }
+      const finalPrompt = prompt.trim();
 
       logger.info(`[FloatingPromptInput] Sending prompt with model: ${selectedModel} (${selectedModelData?.name || 'Unknown'})`);
       onSend(finalPrompt, selectedModel);
@@ -1003,7 +942,7 @@ const FloatingPromptInputInner = (
     id: "default" as ClaudeModel,
     name: "No models available",
     description: "Please configure models in environment variables",
-    icon: <Sparkles className="h-4 w-4" />
+    icon: <span className="text-primary">✨</span>
   });
 
   return (
@@ -1064,103 +1003,20 @@ const FloatingPromptInputInner = (
                 onDrop={handleDrop}
               />
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Model:</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setModelPickerOpen(!modelPickerOpen)}
-                      className="gap-2"
-                    >
-                      {selectedModelData.icon}
-                      {selectedModelData.name}
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Thinking:</span>
-                    <Popover
-                      trigger={
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setThinkingModePickerOpen(!thinkingModePickerOpen)}
-                                className="gap-2"
-                              >
-                                <Brain className="h-4 w-4" />
-                                <ThinkingModeIndicator
-                                  level={
-                                    THINKING_MODES.find((m) => m.id === selectedThinkingMode)
-                                      ?.level || 0
-                                  }
-                                />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="font-medium">
-                                {THINKING_MODES.find((m) => m.id === selectedThinkingMode)?.name ||
-                                  "Auto"}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {
-                                  THINKING_MODES.find((m) => m.id === selectedThinkingMode)
-                                    ?.description
-                                }
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      }
-                      content={
-                        <div className="w-[280px] p-1">
-                          {THINKING_MODES.map((mode) => (
-                            <button
-                              key={mode.id}
-                              onClick={() => {
-                                setSelectedThinkingMode(mode.id);
-                                setThinkingModePickerOpen(false);
-                              }}
-                              className={cn(
-                                "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                                "hover:bg-accent",
-                                selectedThinkingMode === mode.id && "bg-accent"
-                              )}
-                            >
-                              <Brain className="h-4 w-4 mt-0.5" />
-                              <div className="flex-1 space-y-1">
-                                <div className="font-medium text-sm">{mode.name}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {mode.description}
-                                </div>
-                              </div>
-                              <ThinkingModeIndicator level={mode.level} />
-                            </button>
-                          ))}
-                        </div>
-                      }
-                      open={thinkingModePickerOpen}
-                      onOpenChange={setThinkingModePickerOpen}
-                      align="start"
-                      side="top"
-                    />
-                  </div>
-                </div>
-
+              <div className="flex items-center justify-end">
                 <Button
                   onClick={handleSend}
                   disabled={!prompt.trim() || disabled}
                   size="default"
-                  className="min-w-[60px]"
+                  className="min-w-[80px]"
                 >
                   {isLoading ? (
                     <div className="rotating-symbol text-primary-foreground" />
                   ) : (
-                    <Send className="h-4 w-4" />
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      发送
+                    </>
                   )}
                 </Button>
               </div>
@@ -1172,7 +1028,7 @@ const FloatingPromptInputInner = (
       {/* Smart Floating Input Bar */}
       <motion.div
         className={cn(
-          "fixed bottom-4 left-2 right-2 z-40",
+          "absolute bottom-4 left-2 right-2 z-40",
           "bg-gradient-to-t from-background via-background/98 to-background/80",
           "backdrop-blur-md border border-border/50 rounded-lg shadow-xl",
           "transform-gpu will-change-transform", // 优化GPU渲染和布局稳定性
@@ -1185,24 +1041,26 @@ const FloatingPromptInputInner = (
         onDrop={handleDrop}
         initial={{ opacity: 1, y: 0 }}
         animate={{ 
-          opacity: isVisible ? 1 : 0.15, // 完全透明改为低透明度，保持可见但不干扰
-          y: isVisible ? 0 : 10, // 轻微下移，减少视觉干扰
-          pointerEvents: isVisible ? 'auto' : 'none' as any // 透明时禁用交互
+          opacity: alwaysVisible ? 1 : (isVisible ? 1 : 0.15), // 常驻显示时始终完全可见
+          y: alwaysVisible ? 0 : (isVisible ? 0 : 10), // 常驻显示时不下移
+          pointerEvents: (alwaysVisible || isVisible) ? 'auto' : 'none' as any // 常驻显示时始终可交互
         }}
         transition={{ 
           duration: 0.4,
           ease: "easeInOut"
         }}
         onMouseEnter={() => {
-          // 鼠标进入输入框区域时立即显示
-          if (visibilityTimeoutRef.current) {
-            clearTimeout(visibilityTimeoutRef.current);
-            visibilityTimeoutRef.current = null;
+          // 鼠标进入输入框区域时立即显示（仅在非常驻模式下）
+          if (!alwaysVisible) {
+            if (visibilityTimeoutRef.current) {
+              clearTimeout(visibilityTimeoutRef.current);
+              visibilityTimeoutRef.current = null;
+            }
+            setIsVisible(true);
           }
-          setIsVisible(true);
         }}
       >
-        <div className="mx-auto relative px-2">
+        <div className="relative px-2">
           {/* Image previews */}
           {embeddedImages.length > 0 && (
             <ImagePreview
@@ -1212,134 +1070,8 @@ const FloatingPromptInputInner = (
             />
           )}
 
-          <div className="p-4">
-            <div className="flex items-end gap-3">
-              {/* Model Picker */}
-              <Popover
-                trigger={
-                  <Button
-                    variant="outline"
-                    size="default"
-                    disabled={disabled}
-                    className="gap-2 min-w-[180px] justify-start"
-                  >
-                    {selectedModelData.icon}
-                    <span className="flex-1 text-left">{selectedModelData.name}</span>
-                    <ChevronUp className="h-4 w-4 opacity-50" />
-                  </Button>
-                }
-                content={
-                  <div className="w-[300px] p-1">
-                    {modelsLoading ? (
-                      <div className="flex items-center justify-center p-4">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        <span className="ml-2 text-sm text-muted-foreground">Loading models...</span>
-                      </div>
-                    ) : models.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        No models available. Please configure models in environment variables.
-                      </div>
-                    ) : (
-                      models.map((model) => (
-                        <button
-                          key={model.id}
-                          onClick={() => {
-                            logger.info(`[FloatingPromptInput] User manually selected model: ${model.id} (${model.name})`);
-                            const oldModel = selectedModel;
-                            setSelectedModel(model.id);
-                            setModelPickerOpen(false);
-                            updateModelInSettings(model.id);
-                            
-                            // 通知父组件模型已切换
-                            if (onModelChange && oldModel !== model.id) {
-                              onModelChange(model.id, oldModel);
-                            }
-                          }}
-                          className={cn(
-                            "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                            "hover:bg-accent",
-                            selectedModel === model.id && "bg-accent"
-                          )}
-                        >
-                          <div className="mt-0.5">{model.icon}</div>
-                          <div className="flex-1 space-y-1">
-                            <div className="font-medium text-sm">{model.name}</div>
-                            <div className="text-xs text-muted-foreground">{model.description}</div>
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                }
-                open={modelPickerOpen}
-                onOpenChange={setModelPickerOpen}
-                align="start"
-                side="top"
-              />
-
-              {/* Thinking Mode Picker */}
-              <Popover
-                trigger={
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="default"
-                          disabled={disabled}
-                          className="gap-2"
-                        >
-                          <Brain className="h-4 w-4" />
-                          <ThinkingModeIndicator
-                            level={
-                              THINKING_MODES.find((m) => m.id === selectedThinkingMode)?.level || 0
-                            }
-                          />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-medium">
-                          {THINKING_MODES.find((m) => m.id === selectedThinkingMode)?.name ||
-                            "Auto"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {THINKING_MODES.find((m) => m.id === selectedThinkingMode)?.description}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                }
-                content={
-                  <div className="w-[280px] p-1">
-                    {THINKING_MODES.map((mode) => (
-                      <button
-                        key={mode.id}
-                        onClick={() => {
-                          setSelectedThinkingMode(mode.id);
-                          setThinkingModePickerOpen(false);
-                        }}
-                        className={cn(
-                          "w-full flex items-start gap-3 p-3 rounded-md transition-colors text-left",
-                          "hover:bg-accent",
-                          selectedThinkingMode === mode.id && "bg-accent"
-                        )}
-                      >
-                        <Brain className="h-4 w-4 mt-0.5" />
-                        <div className="flex-1 space-y-1">
-                          <div className="font-medium text-sm">{mode.name}</div>
-                          <div className="text-xs text-muted-foreground">{mode.description}</div>
-                        </div>
-                        <ThinkingModeIndicator level={mode.level} />
-                      </button>
-                    ))}
-                  </div>
-                }
-                open={thinkingModePickerOpen}
-                onOpenChange={setThinkingModePickerOpen}
-                align="start"
-                side="top"
-              />
-
+          <div className="p-3">
+            <div className="flex items-end gap-2">
               {/* Prompt Input */}
               <div className="flex-1 relative">
                 <ResizableTextarea
@@ -1351,7 +1083,7 @@ const FloatingPromptInputInner = (
                   placeholder={dragActive ? "Drop images here..." : "Ask Claude anything..."}
                   disabled={disabled}
                   className={cn("pr-10", dragActive && "border-primary")}
-                  minHeight={44}
+                  minHeight={36}
                   maxHeight={200}
                   autoResize={true}
                   showResizeHandle={true}
@@ -1398,8 +1130,8 @@ const FloatingPromptInputInner = (
                 onClick={isLoading ? onCancel : handleSend}
                 disabled={isLoading ? false : !prompt.trim() || disabled}
                 variant={isLoading ? "destructive" : "default"}
-                size="default"
-                className="min-w-[60px]"
+                size="sm"
+                className="min-w-[50px] h-9"
               >
                 {isLoading ? (
                   <>
@@ -1410,12 +1142,6 @@ const FloatingPromptInputInner = (
                   <Send className="h-4 w-4" />
                 )}
               </Button>
-            </div>
-
-            <div className="mt-2 text-xs text-muted-foreground">
-              Press Enter to send, Shift+Enter for new line
-              {projectPath?.trim() &&
-                ", @ to mention files, / for commands, drag & drop or paste images"}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Reorder } from 'framer-motion';
-import { X, Plus, MessageSquare, Bot, AlertCircle, Loader2, Folder, BarChart, Server, Settings, FileText } from 'lucide-react';
+import { X, Plus, MessageSquare, Bot, AlertCircle, Loader2, Folder, BarChart, Server, Settings, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTabState } from '@/hooks/useTabState';
 import { Tab } from '@/contexts/contexts';
 import { useTabContext } from '@/hooks';
@@ -182,9 +182,20 @@ const TabManager: React.FC<TabManagerProps> = ({ className }) => {
   const { reorderTabs } = useTabContext();
 
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  
+  // Collapsed state - load from localStorage
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const saved = localStorage.getItem('tab-manager-collapsed');
+    return saved === 'true';
+  });
 
   // Analytics tracking
   const trackEvent = useTrackEvent();
+
+  // Save collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('tab-manager-collapsed', isCollapsed.toString());
+  }, [isCollapsed]);
 
   // Listen for tab switch events
   useEffect(() => {
@@ -317,11 +328,28 @@ const TabManager: React.FC<TabManagerProps> = ({ className }) => {
     }
   };
 
+  const toggleCollapse = () => {
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    trackEvent.featureUsed?.('tab_manager_collapse', isCollapsed ? 'expand' : 'collapse');
+    
+    // Notify other components about sidebar state change
+    window.dispatchEvent(new CustomEvent('sidebar-state-changed', {
+      detail: { isCollapsed: newState }
+    }));
+  };
+
   return (
-    <div className={cn("flex flex-col h-full bg-muted/15 border-r w-64 md:w-56 lg:w-64 flex-shrink-0 hidden sm:flex", className)}>
+    <div 
+      className={cn(
+        "flex flex-col h-full bg-muted/15 border-r flex-shrink-0 hidden sm:flex transition-all duration-300",
+        isCollapsed ? "w-12" : "w-64 md:w-56 lg:w-64",
+        className
+      )}
+    >
       {/* Tab Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border">
-        <span className="text-sm font-medium text-muted-foreground">Tabs</span>
+      <div className="flex items-center justify-between p-2 border-b border-border gap-1">
+        {!isCollapsed && (
         <button
           onClick={handleNewTab}
           disabled={!canAddTab()}
@@ -336,10 +364,82 @@ const TabManager: React.FC<TabManagerProps> = ({ className }) => {
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
+        )}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={toggleCollapse}
+                className={cn(
+                  "p-1.5 rounded-md transition-all duration-200 flex items-center justify-center",
+                  "border border-border/50 bg-background/50 backdrop-blur-sm",
+                  "hover:bg-muted/80 hover:border-border text-muted-foreground hover:text-foreground hover:shadow-sm",
+                  isCollapsed && "mx-auto"
+                )}
+                title={isCollapsed ? "展开标签栏" : "收缩标签栏"}
+              >
+                {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {isCollapsed ? "展开标签栏" : "收缩标签栏"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Tabs container */}
       <div className="flex-1 overflow-y-auto">
+        {isCollapsed ? (
+          // Collapsed view - show only icons
+          <div className="flex flex-col items-center py-2">
+            {tabs.map((tab) => (
+              <TooltipProvider key={tab.id}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => switchToTab(tab.id)}
+                      className={cn(
+                        "relative w-10 h-10 flex items-center justify-center rounded-md mb-2",
+                        "transition-colors duration-100",
+                        tab.id === activeTabId
+                          ? "bg-card text-card-foreground border-l-2 border-primary"
+                          : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                      )}
+                    >
+                      {(() => {
+                        const Icon = {
+                          chat: MessageSquare,
+                          agent: Bot,
+                          projects: Folder,
+                          usage: BarChart,
+                          mcp: Server,
+                          settings: Settings,
+                          'claude-md': FileText,
+                          'claude-file': FileText,
+                          'agent-execution': Bot,
+                          'create-agent': Plus,
+                          'import-agent': Plus,
+                        }[tab.type] || MessageSquare;
+                        return <Icon className="w-4 h-4" />;
+                      })()}
+                      {tab.status === 'running' && (
+                        <Loader2 className="absolute top-1 right-1 w-2 h-2 animate-spin" />
+                      )}
+                      {tab.hasUnsavedChanges && (
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-primary rounded-full" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p className="font-medium">{tab.title}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ))}
+          </div>
+        ) : (
+          // Expanded view - show full tabs
         <Reorder.Group
           axis="y"
           values={tabs}
@@ -359,6 +459,7 @@ const TabManager: React.FC<TabManagerProps> = ({ className }) => {
             />
           ))}
         </Reorder.Group>
+        )}
       </div>
     </div>
   );
