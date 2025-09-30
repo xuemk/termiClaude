@@ -5,6 +5,7 @@ export const ko: Translations = {
     save: "저장",
     cancel: "취소",
     delete: "삭제",
+    deleting: "삭제 중...",
     edit: "편집",
     add: "추가",
     remove: "제거",
@@ -97,6 +98,10 @@ export const ko: Translations = {
     runningClaudeSessions: "실행 중인 Claude 세션",
     hooks: "훅",
     projectSettings: "프로젝트 설정",
+    deleteProject: "프로젝트 삭제",
+    deleteProjectTitle: "프로젝트 삭제",
+    deleteProjectDescription: "이 프로젝트를 삭제하시겠습니까?",
+    deleteWarning: "프로젝트와 모든 세션 데이터가 영구적으로 삭제됩니다. 이 작업은 취소할 수 없습니다!",
   },
 
   sessions: {
@@ -147,6 +152,18 @@ export const ko: Translations = {
     copyAsJsonl: "JSONL로 복사",
     checkpointSettingsTooltip: "체크포인트 설정",
     timelineNavigatorTooltip: "타임라인 네비게이터",
+    // Message selection and deletion
+    selectMessages: "메시지 선택",
+    selectMessagesToDelete: "삭제할 메시지 선택",
+    selectAll: "전체 선택",
+    deselectAll: "선택 취소",
+    deleteMessages: "메시지 삭제",
+    deleteMessagesConfirm: "메시지 삭제",
+    deleteMessagesDesc: "{count}개의 메시지를 삭제하시겠습니까?",
+    deleteMessagesWarning: "이 작업은 취소할 수 없습니다.",
+    deleteMessagesBackup: "삭제 전에 백업이 생성됩니다.",
+    messagesDeleted: "{count}개의 메시지를 성공적으로 삭제했습니다",
+    failedToDeleteMessages: "메시지 삭제에 실패했습니다. 다시 시도해주세요.",
   },
 
   settings: {

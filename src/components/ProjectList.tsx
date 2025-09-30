@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { FolderOpen, Calendar, FileText, ChevronRight, Settings, MoreVertical, EyeOff, Eye } from "lucide-react";
+import { FolderOpen, Calendar, FileText, ChevronRight, Settings, EyeOff, Eye, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import type { Project } from "@/lib/api";
+import { api, type Project } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date-utils";
 import { Pagination } from "@/components/ui/pagination";
+import { logger } from "@/lib/logger";
 
 interface ProjectListProps {
   /**
@@ -31,6 +34,10 @@ interface ProjectListProps {
    * Callback when hooks configuration is clicked
    */
   onProjectSettings?: (project: Project) => void;
+  /**
+   * Callback when a project is deleted
+   */
+  onProjectDeleted?: (projectId: string) => void;
   /**
    * Whether the list is currently loading
    */
@@ -88,6 +95,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   projects,
   onProjectClick,
   onProjectSettings,
+  onProjectDeleted,
   className,
 }) => {
   const { t } = useI18n();
@@ -97,6 +105,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({
     const saved = localStorage.getItem(HIDDEN_PROJECTS_KEY);
     return saved ? new Set(JSON.parse(saved)) : new Set();
   });
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Save hidden projects to localStorage whenever it changes
   useEffect(() => {
@@ -119,6 +129,46 @@ export const ProjectList: React.FC<ProjectListProps> = ({
 
   // Check if a project is hidden
   const isProjectHidden = (projectId: string) => hiddenProjects.has(projectId);
+
+  // Handle project deletion
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      logger.info(`Deleting project: ${projectToDelete.id} (${projectToDelete.path})`);
+      
+      // Delete the project
+      await api.deleteProject(projectToDelete.id);
+      
+      logger.info(`Successfully deleted project: ${projectToDelete.id}`);
+      
+      // Remove from hidden projects set if it was hidden
+      if (hiddenProjects.has(projectToDelete.id)) {
+        setHiddenProjects(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(projectToDelete.id);
+          return newSet;
+        });
+      }
+      
+      // Notify parent component
+      onProjectDeleted?.(projectToDelete.id);
+    } catch (error) {
+      logger.error("Failed to delete project:", error);
+      // Error handling is done by the API layer
+    } finally {
+      setIsDeleting(false);
+      setProjectToDelete(null);
+    }
+  };
+
+  // Handle delete button click
+  const handleDeleteClick = (e: React.MouseEvent, project: Project) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setProjectToDelete(project);
+  };
 
   // Filter and sort projects based on hidden state
   const filteredProjects = React.useMemo(() => {
@@ -203,8 +253,8 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                         </Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {/* 眼睛图标按钮 - 切换隐藏状态 */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* 隐藏按钮 */}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -217,6 +267,16 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                         ) : (
                           <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
+                      </Button>
+                      {/* 删除按钮 */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+                        onClick={(e) => handleDeleteClick(e, project)}
+                        title="删除项目"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     {project.sessions.length > 0 && (
                         <Badge variant="secondary" className="ml-1 text-xs py-0 h-5">
@@ -245,24 +305,18 @@ export const ProjectList: React.FC<ProjectListProps> = ({
 
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {onProjectSettings && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                              <MoreVertical className="h-3.5 w-3.5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onProjectSettings(project);
-                            }}
-                          >
-                            <Settings className="h-4 w-4 mr-2" />
-                            {t.projects.hooks}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onProjectSettings(project);
+                        }}
+                        title={t.projects.hooks}
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                      </Button>
                     )}
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
@@ -275,6 +329,56 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       </div>
 
       <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.projects.deleteProjectTitle || "删除项目"}</DialogTitle>
+            <DialogDescription>
+              {t.projects.deleteProjectDescription || "确定要删除此项目吗？"}
+              {projectToDelete && (
+                <div className="mt-4 p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FolderOpen className="h-4 w-4 text-primary" />
+                    <span className="font-semibold">{getProjectName(projectToDelete.path)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono">{projectToDelete.path}</p>
+                  <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      {projectToDelete.sessions.length} {t.projects.sessions || "会话"}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {formatTimeAgo(projectToDelete.created_at * 1000)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <p className="mt-4 text-sm text-destructive font-medium">
+                {t.projects.deleteWarning || "此操作将永久删除项目及其所有会话数据，无法恢复！"}
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setProjectToDelete(null)}
+              disabled={isDeleting}
+            >
+              {t.common.cancel || "取消"}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProject}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (t.common.deleting || "删除中...") : (t.common.delete || "删除")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

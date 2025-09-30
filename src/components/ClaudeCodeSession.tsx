@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Brain,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Toast, ToastContainer } from "@/components/ui/toast";
 
 import { SplitPane } from "@/components/ui/split-pane";
 import { WebviewPreview } from "./WebviewPreview";
@@ -151,11 +153,24 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [showPreviewPrompt, setShowPreviewPrompt] = useState(false);
-  const [splitPosition, setSplitPosition] = useState(50);
   const [isPreviewMaximized, setIsPreviewMaximized] = useState(false);
+  const [splitPosition, setSplitPosition] = useState(50);
 
   // Add collapsed state for queued prompts
   const [queuedPromptsCollapsed, setQueuedPromptsCollapsed] = useState(false);
+
+  // Message selection and deletion state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMessageIndices, setSelectedMessageIndices] = useState<Set<number>>(new Set());
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" | "warning" } | null>(null);
+
+  // 滚动状态：跟踪用户是否手动滚动
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
+  // 记录上次消息数量，用于判断是否是新消息
+  const prevMessageCountRef = useRef(0);
 
   // Performance monitoring state
     const parentRef = useRef<globalThis.HTMLDivElement>(null);
@@ -742,37 +757,107 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     onStreamingChange?.(isLoading, claudeSessionId);
   }, [isLoading, claudeSessionId, onStreamingChange]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // 检测是否在底部
+  const isAtBottom = useCallback(() => {
+    const container = parentRef.current;
+    if (container) {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      return distanceFromBottom < 50; // 50px 阈值
+    }
+    return true;
+  }, []);
+
+  // 处理滚动事件 - 检测用户是否手动向上滚动
   useEffect(() => {
-    if (displayableMessages.length > 0) {
+    const container = parentRef.current;
+    if (!container) return;
+
+    let scrollTimeout: NodeJS.Timeout | null = null;
+
+    const handleScroll = () => {
+      // 清除之前的定时器，避免频繁触发
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+
+      // 延迟检测，避免自动滚动触发误判
+      scrollTimeout = setTimeout(() => {
+        if (isAtBottom()) {
+          // 用户滚动到底部，重新启用自动滚动
+          setHasUserScrolled(false);
+        } else {
+          // 用户不在底部，可能是手动滚动了
+          // 只有在 isLoading 时才标记为手动滚动（避免在静止状态时误判）
+          if (isLoading) {
+            setHasUserScrolled(true);
+          }
+        }
+      }, 100); // 100ms 防抖
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+    };
+  }, [isAtBottom, isLoading]);
+
+  // Auto-scroll to bottom when new messages arrive - 只在用户未手动滚动时自动滚动
+  useEffect(() => {
+    if (displayableMessages.length > 0 && !hasUserScrolled) {
+      const isInitialLoad = prevMessageCountRef.current === 0;
+      const isNewMessage = displayableMessages.length > prevMessageCountRef.current;
+      
+      // 更新消息计数
+      prevMessageCountRef.current = displayableMessages.length;
+
+      if (!isNewMessage) return;
+
       // 使用 requestAnimationFrame 确保 DOM 更新后再滚动
       requestAnimationFrame(() => {
         try {
-          rowVirtualizer.scrollToIndex(displayableMessages.length - 1, {
-            align: "end",
-            behavior: "smooth",
-          });
+          const container = parentRef.current;
+          if (!container) return;
 
-          // 双重保障：确保真正滚动到最底部
-          setTimeout(() => {
-            const container = parentRef.current;
-            if (container) {
-              const { scrollHeight, clientHeight } = container;
-              const targetScrollTop = scrollHeight - clientHeight;
-              if (container.scrollTop < targetScrollTop - 10) {
-                container.scrollTo({
-                  top: scrollHeight,
-                  behavior: "smooth",
-                });
-              }
+          if (isInitialLoad) {
+            // 初次加载历史会话：滚动到底部
+            const scrollToBottomInstant = () => {
+              container.scrollTop = container.scrollHeight;
+            };
+            
+            rowVirtualizer.scrollToIndex(displayableMessages.length - 1, {
+              align: "end",
+              behavior: "auto",
+            });
+            
+            scrollToBottomInstant();
+            setTimeout(scrollToBottomInstant, 50);
+            setTimeout(scrollToBottomInstant, 150);
+          } else {
+            // AI 持续输出时：只在内容超出可视区域时才滚动
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+            // 如果最新消息已经不可见（距离底部超过100px），则平滑滚动保持可见
+            if (distanceFromBottom > 100) {
+              // 目标：让新消息显示在容器顶部往下 30% 的位置，为新消息留足展示空间
+              const targetPosition = Math.max(0, scrollHeight - clientHeight * 0.7);
+
+              container.scrollTo({
+                top: targetPosition,
+                behavior: "smooth",
+              });
             }
-          }, 100);
+          }
         } catch (error) {
-          logger.warn("Failed to scroll to bottom:", error);
+          logger.warn("Failed to scroll:", error);
         }
       });
     }
-  }, [displayableMessages.length, rowVirtualizer]);
+  }, [displayableMessages.length, rowVirtualizer, hasUserScrolled]);
 
   // Load session history if resuming
   useEffect(() => {
@@ -987,6 +1072,28 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         logger.info("Claude settings.json updated with environment variables");
       } catch (error) {
         logger.error("Failed to update Claude settings.json:", error);
+      }
+      
+      // 🔧 关键修复：切换环境组时，同步更新选中的模型
+      try {
+        const envVars = await api.getEnvironmentVariables();
+        const enabledGroupVars = envVars.filter(v => v.group_id === selectedId && v.enabled);
+        const mid1Var = enabledGroupVars.find(v => v.key === 'MID_1');
+        
+        if (mid1Var && mid1Var.value.trim()) {
+          const newModelId = mid1Var.value.trim();
+          // 更新组件状态
+          setSelectedModel(newModelId as ClaudeModel);
+          // 更新localStorage
+          localStorage.setItem('selected-model', newModelId);
+          // 同时调用updateClaudeSettingsWithModel确保完全同步
+          await api.updateClaudeSettingsWithModel(newModelId, projectPath);
+          logger.info(`🎯 Synchronized model selection to: ${newModelId}`);
+        } else {
+          logger.warn(`No MID_1 found in enabled group ${selectedGroupName}`);
+        }
+      } catch (error) {
+        logger.error("Failed to sync model selection after environment switch:", error);
       }
       
       // 刷新环境变量和模型配置
@@ -1958,6 +2065,88 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     }
   };
 
+  /**
+   * Toggle selection mode for message deletion
+   */
+  const toggleSelectionMode = () => {
+    setSelectionMode(!selectionMode);
+    setSelectedMessageIndices(new Set());
+  };
+
+  /**
+   * Toggle message selection
+   */
+  const toggleMessageSelection = (index: number) => {
+    const newSelection = new Set(selectedMessageIndices);
+    if (newSelection.has(index)) {
+      newSelection.delete(index);
+    } else {
+      newSelection.add(index);
+    }
+    setSelectedMessageIndices(newSelection);
+  };
+
+  /**
+   * Select all messages
+   */
+  const selectAllMessages = () => {
+    const allIndices = new Set<number>();
+    messages.forEach((_, index) => allIndices.add(index));
+    setSelectedMessageIndices(allIndices);
+  };
+
+  /**
+   * Deselect all messages
+   */
+  const deselectAllMessages = () => {
+    setSelectedMessageIndices(new Set());
+  };
+
+  /**
+   * Delete selected messages
+   */
+  const deleteSelectedMessages = async () => {
+    if (!effectiveSession || selectedMessageIndices.size === 0) return;
+
+    try {
+      // Filter out selected messages
+      const remainingMessages = messages.filter((_, index) => !selectedMessageIndices.has(index));
+      
+      // Save the updated history
+      await api.saveSessionHistory(
+        effectiveSession.id,
+        effectiveSession.project_id,
+        remainingMessages
+      );
+
+      // Update local state
+      const deletedCount = selectedMessageIndices.size;
+      setMessages(remainingMessages);
+      setSelectedMessageIndices(new Set());
+      setSelectionMode(false);
+      setShowDeleteDialog(false);
+
+      setToast({
+        message: t.sessions.messagesDeleted.replace('{count}', deletedCount.toString()),
+        type: "success"
+      });
+
+      trackEvent.sessionEngagement({
+        session_duration_ms: 0,
+        messages_sent: 0,
+        tools_used: [],
+        files_modified: 0,
+        engagement_score: 0,
+      });
+    } catch (err) {
+      logger.error("Failed to delete messages:", err);
+      setToast({
+        message: t.sessions.failedToDeleteMessages,
+        type: "error"
+      });
+    }
+  };
+
   // Cleanup event listeners and track mount state
   useEffect(() => {
     isMountedRef.current = true;
@@ -2078,7 +2267,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     <motion.div
       ref={parentRef}
       className={cn(
-        "flex-1 overflow-y-auto relative pb-32",
+        "flex-1 overflow-y-auto relative pb-40",
         "virtual-container optimized-scroll"
       )}
       style={{
@@ -2094,21 +2283,45 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       >
           {rowVirtualizer.getVirtualItems().map((virtualItem) => {
             const message = displayableMessages[virtualItem.index];
+            const messageIndex = messages.findIndex(m => m === message);
+            const isSelected = selectedMessageIndices.has(messageIndex);
+            
             return (
             <motion.div
                 key={virtualItem.key}
                 data-index={virtualItem.index}
                 ref={(el) => el && rowVirtualizer.measureElement(el)}
-                className="absolute inset-x-2 pb-4"
+                className={cn(
+                  "absolute inset-x-2 pb-4",
+                  selectionMode && "cursor-pointer hover:bg-muted/30 rounded-lg transition-colors",
+                  isSelected && "bg-primary/10 border border-primary/50 rounded-lg"
+                )}
                 style={{
                   top: virtualItem.start,
                 }}
+                onClick={() => selectionMode && messageIndex >= 0 && toggleMessageSelection(messageIndex)}
               >
-                <StreamMessage
-                  message={message}
-                  streamMessages={messages}
-                  onLinkDetected={handleLinkDetected}
-                />
+                {selectionMode && messageIndex >= 0 && (
+                  <div className="absolute top-2 left-2 z-10">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleMessageSelection(messageIndex)}
+                      className="w-4 h-4 cursor-pointer"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                )}
+                <div className={cn(selectionMode && messageIndex >= 0 && "ml-8")}>
+                  <StreamMessage
+                    message={message}
+                    streamMessages={messages}
+                    onLinkDetected={handleLinkDetected}
+                    onCopyToInput={(text) => {
+                      floatingPromptRef.current?.setPrompt(text);
+                    }}
+                  />
+                </div>
             </motion.div>
             );      })}
       </motion.div>
@@ -2244,10 +2457,17 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             {projectPath && availableModels.length > 0 && (
               <Select 
                 value={selectedModel} 
-                onValueChange={(value) => {
+                onValueChange={async (value) => {
                   setSelectedModel(value as ClaudeModel);
                   localStorage.setItem('selected-model', value);
                   logger.info(`Model selected: ${value}`);
+                  // 更新 Claude settings.json 文件
+                  try {
+                    await api.updateClaudeSettingsWithModel(value, projectPath);
+                    logger.info(`Updated Claude settings.json with model: ${value}`);
+                  } catch (error) {
+                    logger.error("Failed to update Claude settings.json with model:", error);
+                  }
                 }}
                 disabled={isLoading || loadingModels}
               >
@@ -2388,6 +2608,63 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                 {t.sessions.copyOutput}
                 <ChevronDown className="h-2 w-2" />
                     </Button>
+            )}
+            {/* Message Selection Mode Controls */}
+            {messages.length > 0 && effectiveSession && (
+              <div className="flex items-center gap-1">
+                {!selectionMode ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleSelectionMode}
+                    className="h-6 px-2 text-xs"
+                    title={t.sessions.selectMessagesToDelete}
+                  >
+                    <Trash2 className="h-2.5 w-2.5 mr-1" />
+                    {t.sessions.selectMessages}
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={selectAllMessages}
+                      className="h-6 px-2 text-xs"
+                      disabled={selectedMessageIndices.size === messages.length}
+                    >
+                      {t.sessions.selectAll}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={deselectAllMessages}
+                      className="h-6 px-2 text-xs"
+                      disabled={selectedMessageIndices.size === 0}
+                    >
+                      {t.sessions.deselectAll}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="h-6 px-2 text-xs"
+                      disabled={selectedMessageIndices.size === 0}
+                    >
+                      <Trash2 className="h-2.5 w-2.5 mr-1" />
+                      {t.sessions.deleteMessages} ({selectedMessageIndices.size})
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleSelectionMode}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <X className="h-2.5 w-2.5 mr-1" />
+                      {t.common.cancel}
+                    </Button>
+                  </>
+                )}
+              </div>
             )}
           </motion.div>
         </motion.div>
@@ -2785,8 +3062,50 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         </Dialog>
       )}
 
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.sessions.deleteMessagesConfirm}</DialogTitle>
+            <DialogDescription>
+              {t.sessions.deleteMessagesDesc.replace('{count}', selectedMessageIndices.size.toString())}
+              <br />
+              {t.sessions.deleteMessagesWarning}
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                {t.sessions.deleteMessagesBackup}
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={deleteSelectedMessages}
+            >
+              {t.common.delete}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Performance Monitor */}
       
+      {/* Toast Notification */}
+      <ToastContainer>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onDismiss={() => setToast(null)}
+          />
+        )}
+      </ToastContainer>
     </motion.div>
   );
 };

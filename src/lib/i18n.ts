@@ -33,6 +33,7 @@ export interface Translations {
     save: string;
     cancel: string;
     delete: string;
+    deleting: string;
     edit: string;
     add: string;
     remove: string;
@@ -127,6 +128,10 @@ export interface Translations {
     runningClaudeSessions: string;
     hooks: string;
     projectSettings: string;
+    deleteProject: string;
+    deleteProjectTitle: string;
+    deleteProjectDescription: string;
+    deleteWarning: string;
   };
 
   // 会话相关
@@ -177,6 +182,18 @@ export interface Translations {
     copyAsJsonl: string;
     checkpointSettingsTooltip: string;
     timelineNavigatorTooltip: string;
+    // Message selection and deletion
+    selectMessages: string;
+    selectMessagesToDelete: string;
+    selectAll: string;
+    deselectAll: string;
+    deleteMessages: string;
+    deleteMessagesConfirm: string;
+    deleteMessagesDesc: string;
+    deleteMessagesWarning: string;
+    deleteMessagesBackup: string;
+    messagesDeleted: string;
+    failedToDeleteMessages: string;
   };
 
   // 设置页面

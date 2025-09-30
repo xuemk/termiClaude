@@ -234,7 +234,7 @@ export const LSResultWidget: React.FC<LSResultWidgetProps> = ({ content }) => {
           return <FileCode className="h-3.5 w-3.5 text-cyan-500" />;
         case "sh":
         case "bash":
-          return <Terminal className="h-3.5 w-3.5 text-green-500" />;
+          return <Terminal className="h-3.5 w-3.5 text-green-400 dark:text-green-500" />;
         default:
           return <FileText className="h-3.5 w-3.5 text-muted-foreground" />;
       }

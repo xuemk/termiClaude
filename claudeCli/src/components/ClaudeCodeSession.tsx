@@ -142,6 +142,16 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   // Add collapsed state for queued prompts
   const [queuedPromptsCollapsed, setQueuedPromptsCollapsed] = useState(false);
 
+  // 滚动状态：跟踪用户是否手动滚动
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
+  // 记录上次消息数量，用于判断是否是新消息
+  const prevMessageCountRef = useRef(0);
+
+  // 模型和思考模式状态
+  const [availableModels, setAvailableModels] = useState<{ id: ClaudeModel; name: string; description?: string }[]>([]);
+  const [selectedModel, setSelectedModel] = useState<ClaudeModel>("sonnet-3-5");
+  const [loadingModels, setLoadingModels] = useState(false);
+
   const parentRef = useRef<globalThis.HTMLDivElement>(null);
   const unlistenRefs = useRef<UnlistenFn[]>([]);
   const hasActiveSessionRef = useRef(false);
@@ -458,37 +468,136 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     onStreamingChange?.(isLoading, claudeSessionId);
   }, [isLoading, claudeSessionId, onStreamingChange]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // 检测是否在底部
+  const isAtBottom = useCallback(() => {
+    const container = parentRef.current;
+    if (container) {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      return distanceFromBottom < 50; // 50px 阈值
+    }
+    return true;
+  }, []);
+
+  // 处理滚动事件 - 检测用户是否手动向上滚动
   useEffect(() => {
-    if (displayableMessages.length > 0) {
+    const container = parentRef.current;
+    if (!container) return;
+
+    let scrollTimeout: NodeJS.Timeout | null = null;
+
+    const handleScroll = () => {
+      // 清除之前的定时器，避免频繁触发
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+
+      // 延迟检测，避免自动滚动触发误判
+      scrollTimeout = setTimeout(() => {
+        if (isAtBottom()) {
+          // 用户滚动到底部，重新启用自动滚动
+          setHasUserScrolled(false);
+        } else {
+          // 用户不在底部，可能是手动滚动了
+          // 只有在 isLoading 时才标记为手动滚动（避免在静止状态时误判）
+          if (isLoading) {
+            setHasUserScrolled(true);
+          }
+        }
+      }, 100); // 100ms 防抖
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout) {
+        clearTimeout(scrollTimeout);
+      }
+    };
+  }, [isAtBottom, isLoading]);
+
+  // Auto-scroll to bottom when new messages arrive - 只在用户未手动滚动时自动滚动
+  useEffect(() => {
+    if (displayableMessages.length > 0 && !hasUserScrolled) {
+      const isInitialLoad = prevMessageCountRef.current === 0;
+      const isNewMessage = displayableMessages.length > prevMessageCountRef.current;
+      
+      // 更新消息计数
+      prevMessageCountRef.current = displayableMessages.length;
+
+      if (!isNewMessage) return;
+
       // 使用 requestAnimationFrame 确保 DOM 更新后再滚动
       requestAnimationFrame(() => {
         try {
+          const container = parentRef.current;
+          if (!container) return;
+
+          if (isInitialLoad) {
+            // 初次加载历史会话：滚动到底部
+            const scrollToBottomInstant = () => {
+              container.scrollTop = container.scrollHeight;
+            };
+            
+            rowVirtualizer.scrollToIndex(displayableMessages.length - 1, {
+              align: "end",
+              behavior: "auto",
+            });
+            
+            scrollToBottomInstant();
+            setTimeout(scrollToBottomInstant, 50);
+            setTimeout(scrollToBottomInstant, 150);
+          } else {
+            // AI 持续输出时：只在内容超出可视区域时才滚动
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+            // 如果最新消息已经不可见（距离底部超过100px），则平滑滚动保持可见
+            if (distanceFromBottom > 100) {
+              // 目标：让新消息显示在容器顶部往下 30% 的位置，为新消息留足展示空间
+              const targetPosition = Math.max(0, scrollHeight - clientHeight * 0.7);
+
+              container.scrollTo({
+                top: targetPosition,
+                behavior: "smooth",
+              });
+            }
+          }
+        } catch (error) {
+          logger.warn("Failed to scroll:", error);
+        }
+      });
+    }
+  }, [displayableMessages.length, rowVirtualizer, hasUserScrolled, isLoading]);
+
+  // 当 loading 结束时，自动滚动到底部
+  useEffect(() => {
+    if (!isLoading && displayableMessages.length > 0 && !hasUserScrolled) {
+      requestAnimationFrame(() => {
+        try {
+          const container = parentRef.current;
+          if (!container) return;
+
+          // Loading 完成后，平滑滚动到底部
+          const scrollToBottomSmooth = () => {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: "smooth",
+            });
+          };
+
           rowVirtualizer.scrollToIndex(displayableMessages.length - 1, {
             align: "end",
             behavior: "smooth",
           });
-          
-          // 双重保障：确保真正滚动到最底部
-          setTimeout(() => {
-            const container = parentRef.current;
-            if (container) {
-              const { scrollHeight, clientHeight } = container;
-              const targetScrollTop = scrollHeight - clientHeight;
-              if (container.scrollTop < targetScrollTop - 10) {
-                container.scrollTo({
-                  top: scrollHeight,
-                  behavior: "smooth",
-                });
-              }
-            }
-          }, 100);
+
+          setTimeout(scrollToBottomSmooth, 50);
         } catch (error) {
-          logger.warn("Failed to scroll to bottom:", error);
+          logger.warn("Failed to scroll to bottom on completion:", error);
         }
       });
     }
-  }, [displayableMessages.length, rowVirtualizer]);
+  }, [isLoading, rowVirtualizer, hasUserScrolled, displayableMessages.length]);
 
   // Load session history if resuming
   useEffect(() => {
@@ -1573,6 +1682,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
                   message={message}
                   streamMessages={messages}
                   onLinkDetected={handleLinkDetected}
+                  onCopyToInput={(text) => {
+                    floatingPromptRef.current?.setPrompt(text);
+                  }}
                 />
               </motion.div>
             );

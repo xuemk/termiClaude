@@ -5,6 +5,7 @@ export const ar: Translations = {
     save: "حفظ",
     cancel: "إلغاء",
     delete: "حذف",
+    deleting: "جاري الحذف...",
     edit: "تعديل",
     add: "إضافة",
     remove: "إزالة",
@@ -96,6 +97,10 @@ export const ar: Translations = {
     runningClaudeSessions: "جلسات Claude قيد التشغيل",
     hooks: "الخطافات",
     projectSettings: "إعدادات المشروع",
+    deleteProject: "حذف المشروع",
+    deleteProjectTitle: "حذف المشروع",
+    deleteProjectDescription: "هل أنت متأكد أنك تريد حذف هذا المشروع؟",
+    deleteWarning: "سيؤدي هذا إلى حذف المشروع وجميع بيانات الجلسات بشكل دائم. لا يمكن التراجع عن هذا الإجراء!",
   },
 
   sessions: {
@@ -146,6 +151,18 @@ export const ar: Translations = {
     copyAsJsonl: "نسخ كـ JSONL",
     checkpointSettingsTooltip: "إعدادات نقاط التحقق",
     timelineNavigatorTooltip: "متصفح الجدول الزمني",
+    // Message selection and deletion
+    selectMessages: "تحديد الرسائل",
+    selectMessagesToDelete: "حدد الرسائل المراد حذفها",
+    selectAll: "تحديد الكل",
+    deselectAll: "مسح",
+    deleteMessages: "حذف الرسائل",
+    deleteMessagesConfirm: "حذف الرسائل",
+    deleteMessagesDesc: "هل أنت متأكد من رغبتك في حذف {count} رسالة؟",
+    deleteMessagesWarning: "لا يمكن التراجع عن هذا الإجراء.",
+    deleteMessagesBackup: "سيتم إنشاء نسخة احتياطية قبل الحذف.",
+    messagesDeleted: "تم حذف {count} رسالة بنجاح",
+    failedToDeleteMessages: "فشل حذف الرسائل. الرجاء المحاولة مرة أخرى.",
   },
 
   settings: {

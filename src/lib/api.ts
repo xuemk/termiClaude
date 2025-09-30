@@ -1138,6 +1138,13 @@ export const api = {
   },
 
   /**
+   * Saves the JSONL history for a specific session (supports message deletion)
+   */
+  async saveSessionHistory(sessionId: string, projectId: string, messages: unknown[]): Promise<void> {
+    return invoke("save_session_history", { sessionId, projectId, messages });
+  },
+
+  /**
    * Loads the JSONL history for a specific agent session
    * Similar to loadSessionHistory but searches across all project directories
    * @param sessionId - The session ID (UUID)
@@ -2097,6 +2104,15 @@ export const api = {
    * @param sessionId - The session ID to delete
    * @param projectId - The project ID containing the session
    */
+  async deleteProject(projectId: string): Promise<void> {
+    try {
+      await invoke("delete_project", { projectId });
+    } catch (error) {
+      await handleApiError(error as Error, { operation: 'deleteProject', projectId });
+      throw error;
+    }
+  },
+
   async deleteSession(sessionId: string, projectId: string): Promise<void> {
     try {
       await invoke("delete_session", { sessionId, projectId });
@@ -2265,6 +2281,19 @@ export const api = {
     } catch (error) {
       logger.error("Failed to get available models:", error);
       throw error;
+    }
+  },
+
+  /**
+   * Marks an internal settings update to prevent triggering config conflict detection
+   * This should be called before saving settings from the Settings UI
+   */
+  async markInternalSettingsUpdate(): Promise<void> {
+    try {
+      await invoke("mark_internal_settings_update");
+    } catch (error) {
+      logger.error("Failed to mark internal settings update:", error);
+      // Don't throw - this is a best-effort operation
     }
   },
 };

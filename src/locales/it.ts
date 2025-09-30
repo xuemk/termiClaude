@@ -5,6 +5,7 @@ export const it: Translations = {
     save: "Salva",
     cancel: "Annulla",
     delete: "Elimina",
+    deleting: "Eliminazione...",
     edit: "Modifica",
     add: "Aggiungi",
     remove: "Rimuovi",
@@ -96,6 +97,10 @@ export const it: Translations = {
     runningClaudeSessions: "Sessioni Claude in esecuzione",
     hooks: "Hook",
     projectSettings: "Impostazioni progetto",
+    deleteProject: "Elimina progetto",
+    deleteProjectTitle: "Elimina progetto",
+    deleteProjectDescription: "Sei sicuro di voler eliminare questo progetto?",
+    deleteWarning: "Questo eliminerà permanentemente il progetto e tutti i dati delle sessioni. Questa azione non può essere annullata!",
   },
 
   sessions: {
@@ -147,6 +152,18 @@ export const it: Translations = {
     copyAsJsonl: "Copia come JSONL",
     checkpointSettingsTooltip: "Impostazioni Checkpoint",
     timelineNavigatorTooltip: "Navigatore Timeline",
+    // Message selection and deletion
+    selectMessages: "Seleziona Messaggi",
+    selectMessagesToDelete: "Seleziona i messaggi da eliminare",
+    selectAll: "Seleziona Tutto",
+    deselectAll: "Cancella",
+    deleteMessages: "Elimina Messaggi",
+    deleteMessagesConfirm: "Elimina Messaggi",
+    deleteMessagesDesc: "Sei sicuro di voler eliminare {count} messaggio/i?",
+    deleteMessagesWarning: "Questa azione non può essere annullata.",
+    deleteMessagesBackup: "Verrà creato un backup prima dell'eliminazione.",
+    messagesDeleted: "{count} messaggio/i eliminato/i con successo",
+    failedToDeleteMessages: "Impossibile eliminare i messaggi. Si prega di riprovare.",
   },
 
   settings: {

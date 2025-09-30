@@ -377,6 +377,11 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
                             // Project settings functionality can be added here if needed
                             logger.debug("Project settings clicked for:", project);
                           }}
+                          onProjectDeleted={(projectId) => {
+                            // Remove the deleted project from the local state
+                            setProjects(prev => prev.filter(p => p.id !== projectId));
+                            logger.info("Project deleted:", projectId);
+                          }}
                           loading={loading}
                           className="animate-fade-in"
                         />

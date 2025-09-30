@@ -16,11 +16,50 @@ interface TabContextType {
 }
 
 const STORAGE_KEY = 'claudia_tabs';
+const CUSTOM_TAB_NAMES_KEY = 'claudia_custom_tab_names'; // 存储会话自定义名称
 
 export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [navigationHistory, setNavigationHistory] = useState<string[]>([]);
+
+  // Helper functions for custom tab names persistence
+  const saveCustomTabName = useCallback((sessionId: string, customName: string) => {
+    try {
+      const stored = localStorage.getItem(CUSTOM_TAB_NAMES_KEY);
+      const customNames = stored ? JSON.parse(stored) : {};
+      customNames[sessionId] = customName;
+      localStorage.setItem(CUSTOM_TAB_NAMES_KEY, JSON.stringify(customNames));
+    } catch (error) {
+      console.error('Failed to save custom tab name:', error);
+    }
+  }, []);
+
+  const getCustomTabName = useCallback((sessionId: string): string | undefined => {
+    try {
+      const stored = localStorage.getItem(CUSTOM_TAB_NAMES_KEY);
+      if (stored) {
+        const customNames = JSON.parse(stored);
+        return customNames[sessionId];
+      }
+    } catch (error) {
+      console.error('Failed to get custom tab name:', error);
+    }
+    return undefined;
+  }, []);
+
+  const removeCustomTabName = useCallback((sessionId: string) => {
+    try {
+      const stored = localStorage.getItem(CUSTOM_TAB_NAMES_KEY);
+      if (stored) {
+        const customNames = JSON.parse(stored);
+        delete customNames[sessionId];
+        localStorage.setItem(CUSTOM_TAB_NAMES_KEY, JSON.stringify(customNames));
+      }
+    } catch (error) {
+      console.error('Failed to remove custom tab name:', error);
+    }
+  }, []);
 
   // Custom setActiveTab that maintains navigation history
   const setActiveTabWithHistory = useCallback((tabId: string | null) => {
@@ -62,8 +101,21 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         throw new Error(`Maximum number of tabs (${MAX_TABS}) reached`);
       }
 
+      // 如果是chat或agent类型，尝试恢复保存的自定义名称
+      let customTitle = tabData.customTitle;
+      if ((tabData.type === 'chat' || tabData.type === 'agent') && !customTitle) {
+        const sessionId = tabData.sessionId || (tabData.sessionData as any)?.id;
+        if (sessionId) {
+          const savedCustomName = getCustomTabName(sessionId);
+          if (savedCustomName) {
+            customTitle = savedCustomName;
+          }
+        }
+      }
+
       const newTab: Tab = {
         ...tabData,
+        customTitle,
         id: generateTabId(),
         order: tabs.length,
         createdAt: new Date(),
@@ -74,7 +126,7 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveTabWithHistory(newTab.id);
       return newTab.id;
     },
-    [tabs.length]
+    [tabs.length, getCustomTabName, setActiveTabWithHistory]
   );
 
   const removeTab = useCallback(
@@ -149,9 +201,29 @@ export const TabProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTab = useCallback((id: string, updates: Partial<Tab>) => {
     setTabs((prevTabs) =>
-      prevTabs.map((tab) => (tab.id === id ? { ...tab, ...updates, updatedAt: new Date() } : tab))
+      prevTabs.map((tab) => {
+        if (tab.id === id) {
+          const updatedTab = { ...tab, ...updates, updatedAt: new Date() };
+          
+          // 如果更新了customTitle，保存到localStorage
+          if ('customTitle' in updates && (tab.type === 'chat' || tab.type === 'agent')) {
+            const sessionId = tab.sessionId || (tab.sessionData as any)?.id;
+            if (sessionId) {
+              if (updates.customTitle) {
+                saveCustomTabName(sessionId, updates.customTitle);
+              } else {
+                // 如果customTitle被清除，也从存储中删除
+                removeCustomTabName(sessionId);
+              }
+            }
+          }
+          
+          return updatedTab;
+        }
+        return tab;
+      })
     );
-  }, []);
+  }, [saveCustomTabName, removeCustomTabName]);
 
   // Update setActiveTabWithHistory to include tab status updates
   const setActiveTabWithHistoryAndStatus = useCallback((id: string) => {

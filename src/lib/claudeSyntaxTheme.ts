@@ -36,17 +36,17 @@ export const getClaudeSyntaxTheme = (theme: ThemeMode): { [key: string]: React.C
       operator: '#a1a1aa',
     },
     light: {
-      base: '#1f2937',
+      base: '#1f2937',      // 深灰色 - 在白色背景上清晰可见
       background: 'transparent',
-      comment: '#9ca3af',
-      punctuation: '#6b7280',
-      property: '#dc2626', // Red
-      tag: '#7c3aed', // Purple
-      string: '#059669', // Green
-      function: '#2563eb', // Blue
-      keyword: '#9333ea', // Purple
-      variable: '#8b5cf6', // Violet
-      operator: '#6b7280',
+      comment: '#6b7280',   // 中灰色 - 注释
+      punctuation: '#4b5563', // 深灰色 - 标点符号更明显
+      property: '#dc2626',  // 深红色
+      tag: '#7c3aed',       // 紫色
+      string: '#059669',    // 深绿色
+      function: '#2563eb',  // 蓝色
+      keyword: '#9333ea',   // 紫色
+      variable: '#7c3aed',  // 紫罗兰
+      operator: '#4b5563',  // 深灰色 - 操作符
     },
     white: {
       base: '#000000',

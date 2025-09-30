@@ -1232,6 +1232,11 @@ pub async fn update_claude_settings_with_model(
 ) -> Result<String, String> {
     log::info!("Updating Claude settings.json with model: {}", model_id);
 
+    // 标记为内部更新（避免触发监听器）
+    if let Err(e) = crate::commands::settings_monitor::mark_internal_settings_update(app.clone()).await {
+        log::warn!("Failed to mark internal update: {}", e);
+    }
+
     // 记录当前选择的模型到app_settings
     if let Err(e) = crate::commands::storage::save_app_setting(
         app.clone(), 
@@ -1478,7 +1483,47 @@ pub async fn load_session_history(
     Ok(messages)
 }
 
+/// Saves the JSONL history for a specific session (supports message deletion)
+#[tauri::command]
+pub async fn save_session_history(
+    session_id: String,
+    project_id: String,
+    messages: Vec<serde_json::Value>,
+) -> Result<(), String> {
+    log::info!(
+        "Saving session history for session: {} in project: {} ({} messages)",
+        session_id,
+        project_id,
+        messages.len()
+    );
 
+    let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;
+    let session_path = claude_dir
+        .join("projects")
+        .join(&project_id)
+        .join(format!("{}.jsonl", session_id));
+
+    // Create a backup of the original file
+    if session_path.exists() {
+        let backup_path = session_path.with_extension("jsonl.backup");
+        fs::copy(&session_path, &backup_path)
+            .map_err(|e| format!("Failed to create backup: {}", e))?;
+        log::info!("Created backup at: {:?}", backup_path);
+    }
+
+    // Write the new messages to the session file
+    let mut content = String::new();
+    for message in messages {
+        content.push_str(&serde_json::to_string(&message).map_err(|e| e.to_string())?);
+        content.push('\n');
+    }
+
+    fs::write(&session_path, content)
+        .map_err(|e| format!("Failed to write session file: {}", e))?;
+
+    log::info!("Session history saved successfully");
+    Ok(())
+}
 
 /// Execute a new interactive Claude Code session with streaming output
 #[tauri::command]
@@ -3091,6 +3136,61 @@ pub async fn validate_hook_command(command: String) -> Result<serde_json::Value,
         }
         Err(e) => Err(format!("Failed to validate command: {}", e))
     }
+}
+
+/// Deletes an entire project and all its sessions
+#[tauri::command]
+pub async fn delete_project(
+    app: tauri::State<'_, crate::checkpoint::state::CheckpointState>,
+    project_id: String,
+) -> Result<(), String> {
+    log::info!("Deleting project: {}", project_id);
+
+    let claude_dir = get_claude_dir().map_err(|e| e.to_string())?;
+    let project_dir = claude_dir.join("projects").join(&project_id);
+
+    // Check if project directory exists
+    if !project_dir.exists() {
+        return Err(format!("Project not found: {}", project_id));
+    }
+
+    // Get all session files in the project
+    let session_files: Vec<_> = fs::read_dir(&project_dir)
+        .map_err(|e| format!("Failed to read project directory: {}", e))?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry.path().is_file() && 
+            entry.path().extension().and_then(|s| s.to_str()) == Some("jsonl")
+        })
+        .collect();
+
+    log::info!("Found {} session(s) in project {}", session_files.len(), project_id);
+
+    // Clear checkpoint managers for all sessions
+    for entry in &session_files {
+        if let Some(session_id) = entry.path().file_stem().and_then(|s| s.to_str()) {
+            app.remove_manager(session_id).await;
+            
+            // Delete associated todo data
+            let todos_dir = claude_dir.join("todos");
+            let todo_file = todos_dir.join(format!("{}.json", session_id));
+            if todo_file.exists() {
+                if let Err(e) = fs::remove_file(&todo_file) {
+                    log::warn!("Failed to delete todo file for session {}: {}", session_id, e);
+                } else {
+                    log::info!("Successfully deleted todo file: {:?}", todo_file);
+                }
+            }
+        }
+    }
+
+    // Delete the entire project directory
+    fs::remove_dir_all(&project_dir)
+        .map_err(|e| format!("Failed to delete project directory: {}", e))?;
+
+    log::info!("Successfully deleted project directory: {:?}", project_dir);
+
+    Ok(())
 }
 
 /// Deletes a session file and its associated data

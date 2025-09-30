@@ -71,9 +71,9 @@ const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
       
       if (variant === "status-colors") {
         return {
-          backgroundColor: checked ? "#22c55e" : "#ef4444", // 绿色(启用) / 红色(禁用)
+          backgroundColor: checked ? "#10b981" : "#ef4444", // 更亮的绿色(启用) / 红色(禁用)
           border: "2px solid transparent",
-          boxShadow: checked ? "0 0 0 1px #16a34a" : "0 0 0 1px #dc2626", // 边框阴影
+          boxShadow: checked ? "0 0 8px rgba(16, 185, 129, 0.4)" : "0 0 8px rgba(239, 68, 68, 0.4)", // 发光效果
         };
       }
       

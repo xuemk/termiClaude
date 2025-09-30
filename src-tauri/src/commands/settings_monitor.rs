@@ -71,8 +71,8 @@ impl SettingsMonitor {
         // 启动定期检查任务
         let app_clone = app_handle.clone();
         tauri::async_runtime::spawn(async move {
-            // 等待3秒后开始监听，避免启动时的配置更新被误判
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            // 等待5秒后开始监听，避免启动时的配置更新被误判
+            tokio::time::sleep(Duration::from_secs(5)).await;
             log::info!("Settings monitor: Starting file change detection after startup delay");
             
             // 更频繁的检测间隔以提高响应性
@@ -98,7 +98,7 @@ impl SettingsMonitor {
             }
         });
 
-        log::info!("Settings monitor started with 3s startup delay, 1.5s check interval");
+        log::info!("Settings monitor started with 5s startup delay, 1.5s check interval");
         Ok(())
     }
 
@@ -592,41 +592,28 @@ pub async fn check_config_consistency_simple(
 
     let mut inconsistencies = Vec::new();
 
-    // 1. 检查模型
+    // 1. 检查模型 - 只在配置文件有值且与当前选择不一致时报错
     if let Some(settings_model_val) = settings_model {
         if settings_model_val != current_selected_model {
             inconsistencies.push(format!("模型不一致: 工具选择='{}', 配置文件='{}'", current_selected_model, settings_model_val));
         }
-    } else {
-        inconsistencies.push("配置文件缺少ANTHROPIC_MODEL".to_string());
     }
+    // 如果配置文件缺少ANTHROPIC_MODEL，不认为是错误（允许数据库管理模型）
 
-    // 2. 检查令牌
+    // 2. 检查令牌 - 只在值不一致时报错，缺少不报错
     match (settings_token, db_token) {
         (Some(s), Some(d)) if s != d => {
             inconsistencies.push("认证令牌不一致".to_string());
         }
-        (Some(_), None) => {
-            inconsistencies.push("数据库缺少认证令牌".to_string());
-        }
-        (None, Some(_)) => {
-            inconsistencies.push("配置文件缺少认证令牌".to_string());
-        }
-        _ => {} // 一致或都为空
+        _ => {} // 其他情况都不认为是错误
     }
 
-    // 3. 检查URL
+    // 3. 检查URL - 只在值不一致时报错，缺少不报错
     match (settings_url, db_url) {
         (Some(s), Some(d)) if s != d => {
             inconsistencies.push("API地址不一致".to_string());
         }
-        (Some(_), None) => {
-            inconsistencies.push("数据库缺少API地址".to_string());
-        }
-        (None, Some(_)) => {
-            inconsistencies.push("配置文件缺少API地址".to_string());
-        }
-        _ => {} // 一致或都为空
+        _ => {} // 其他情况都不认为是错误
     }
 
     let needs_refresh = !inconsistencies.is_empty();

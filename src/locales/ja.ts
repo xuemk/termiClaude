@@ -5,6 +5,7 @@ export const ja: Translations = {
     save: "保存",
     cancel: "キャンセル",
     delete: "削除",
+    deleting: "削除中...",
     edit: "編集",
     add: "追加",
     remove: "削除",
@@ -97,6 +98,10 @@ export const ja: Translations = {
     runningClaudeSessions: "実行中のClaudeセッション",
     hooks: "フック",
     projectSettings: "プロジェクト設定",
+    deleteProject: "プロジェクトを削除",
+    deleteProjectTitle: "プロジェクトを削除",
+    deleteProjectDescription: "このプロジェクトを削除してもよろしいですか？",
+    deleteWarning: "プロジェクトとすべてのセッションデータが完全に削除されます。この操作は元に戻せません！",
   },
 
   sessions: {
@@ -147,6 +152,18 @@ export const ja: Translations = {
     copyAsJsonl: "JSONLとしてコピー",
     checkpointSettingsTooltip: "チェックポイント設定",
     timelineNavigatorTooltip: "タイムラインナビゲーター",
+    // Message selection and deletion
+    selectMessages: "メッセージを選択",
+    selectMessagesToDelete: "削除するメッセージを選択",
+    selectAll: "すべて選択",
+    deselectAll: "クリア",
+    deleteMessages: "メッセージを削除",
+    deleteMessagesConfirm: "メッセージを削除",
+    deleteMessagesDesc: "{count}件のメッセージを削除してもよろしいですか？",
+    deleteMessagesWarning: "この操作は元に戻せません。",
+    deleteMessagesBackup: "削除前にバックアップが作成されます。",
+    messagesDeleted: "{count}件のメッセージを正常に削除しました",
+    failedToDeleteMessages: "メッセージの削除に失敗しました。もう一度お試しください。",
   },
 
   settings: {

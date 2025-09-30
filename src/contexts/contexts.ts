@@ -19,6 +19,7 @@ export interface Tab {
     | "create-agent"
     | "import-agent";
   title: string;
+  customTitle?: string; // Custom user-defined title for the tab
   sessionId?: string;
   sessionData?: unknown;
   agentRunId?: string;
@@ -76,3 +77,5 @@ interface ToastContextValue {
 
 export const TabContext = createContext<TabContextType | undefined>(undefined);
 export const ToastContext = createContext<ToastContextValue | undefined>(undefined);
+
+

@@ -22,12 +22,12 @@ use commands::agents::{
 };
 use commands::claude::{
     cancel_claude_execution, check_auto_checkpoint, check_claude_version, cleanup_old_checkpoints,
-    clear_checkpoint_manager, continue_claude_code, create_checkpoint, delete_session, execute_claude_code,
+    clear_checkpoint_manager, continue_claude_code, create_checkpoint, delete_project, delete_session, execute_claude_code,
     find_claude_md_files, fork_from_checkpoint, get_checkpoint_diff, get_checkpoint_settings,
     get_checkpoint_state_stats, get_claude_session_output, get_claude_settings, get_project_sessions,
     get_recently_modified_files, get_session_timeline, get_system_prompt, list_checkpoints,
     list_directory_contents, list_projects, list_running_claude_sessions, load_session_history,
-    open_new_session, read_claude_md_file, restore_checkpoint, resume_claude_code,
+    save_session_history, open_new_session, read_claude_md_file, restore_checkpoint, resume_claude_code,
     save_claude_md_file, delete_claude_md_file, save_claude_settings, update_claude_settings_with_env_group, update_claude_settings_with_model, save_system_prompt, search_files,
     track_checkpoint_message, track_session_messages, update_checkpoint_settings,
     get_hooks_config, update_hooks_config, validate_hook_command,
@@ -186,6 +186,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             list_directory_contents,
             search_files,
             get_recently_modified_files,
+            delete_project,
             delete_session,
             get_hooks_config,
             update_hooks_config,
@@ -310,6 +311,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             get_detailed_configuration_status,
             check_config_consistency_simple,
             refresh_configuration_keep_model,
+            save_session_history,
         ])
         .run(tauri::generate_context!())
         .map_err(|e| {
@@ -319,3 +321,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+

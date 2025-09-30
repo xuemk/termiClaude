@@ -5,6 +5,7 @@ export const de: Translations = {
     save: "Speichern",
     cancel: "Abbrechen",
     delete: "Löschen",
+    deleting: "Löschen...",
     edit: "Bearbeiten",
     add: "Hinzufügen",
     remove: "Entfernen",
@@ -98,6 +99,10 @@ export const de: Translations = {
     runningClaudeSessions: "Laufende Claude Sitzungen",
     hooks: "Hooks",
     projectSettings: "Projekteinstellungen",
+    deleteProject: "Projekt löschen",
+    deleteProjectTitle: "Projekt löschen",
+    deleteProjectDescription: "Sind Sie sicher, dass Sie dieses Projekt löschen möchten?",
+    deleteWarning: "Dadurch werden das Projekt und alle zugehörigen Sitzungsdaten dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden!",
   },
 
   sessions: {
@@ -149,6 +154,18 @@ export const de: Translations = {
     copyAsJsonl: "Als JSONL kopieren",
     checkpointSettingsTooltip: "Checkpoint-Einstellungen",
     timelineNavigatorTooltip: "Zeitleisten-Navigator",
+    // Message selection and deletion
+    selectMessages: "Nachrichten auswählen",
+    selectMessagesToDelete: "Nachrichten zum Löschen auswählen",
+    selectAll: "Alle auswählen",
+    deselectAll: "Löschen",
+    deleteMessages: "Nachrichten löschen",
+    deleteMessagesConfirm: "Nachrichten löschen",
+    deleteMessagesDesc: "Möchten Sie wirklich {count} Nachricht(en) löschen?",
+    deleteMessagesWarning: "Diese Aktion kann nicht rückgängig gemacht werden.",
+    deleteMessagesBackup: "Vor dem Löschen wird eine Sicherung erstellt.",
+    messagesDeleted: "{count} Nachricht(en) erfolgreich gelöscht",
+    failedToDeleteMessages: "Fehler beim Löschen der Nachrichten. Bitte versuchen Sie es erneut.",
   },
 
   settings: {

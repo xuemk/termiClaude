@@ -5,6 +5,7 @@ export const fr: Translations = {
     save: "Enregistrer",
     cancel: "Annuler",
     delete: "Supprimer",
+    deleting: "Suppression en cours...",
     edit: "Modifier",
     add: "Ajouter",
     remove: "Retirer",
@@ -98,6 +99,10 @@ export const fr: Translations = {
     runningClaudeSessions: "Sessions Claude en cours",
     hooks: "Hooks",
     projectSettings: "Paramètres du projet",
+    deleteProject: "Supprimer le projet",
+    deleteProjectTitle: "Supprimer le projet",
+    deleteProjectDescription: "Êtes-vous sûr de vouloir supprimer ce projet ?",
+    deleteWarning: "Cette action supprimera définitivement le projet et toutes ses données de session. Cette action ne peut pas être annulée !",
   },
 
   sessions: {
@@ -150,6 +155,18 @@ export const fr: Translations = {
     copyAsJsonl: "Copier en JSONL",
     checkpointSettingsTooltip: "Paramètres des Points de Contrôle",
     timelineNavigatorTooltip: "Navigateur de Chronologie",
+    // Message selection and deletion
+    selectMessages: "Sélectionner les Messages",
+    selectMessagesToDelete: "Sélectionner les messages à supprimer",
+    selectAll: "Tout Sélectionner",
+    deselectAll: "Effacer",
+    deleteMessages: "Supprimer les Messages",
+    deleteMessagesConfirm: "Supprimer les Messages",
+    deleteMessagesDesc: "Êtes-vous sûr de vouloir supprimer {count} message(s)?",
+    deleteMessagesWarning: "Cette action ne peut pas être annulée.",
+    deleteMessagesBackup: "Une sauvegarde sera créée avant la suppression.",
+    messagesDeleted: "{count} message(s) supprimé(s) avec succès",
+    failedToDeleteMessages: "Échec de la suppression des messages. Veuillez réessayer.",
   },
 
   settings: {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Terminal, User, Bot, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Terminal, User, Bot, AlertCircle, CheckCircle2, Copy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -44,6 +45,7 @@ interface StreamMessageProps {
   className?: string;
   streamMessages: ClaudeStreamMessage[];
   onLinkDetected?: (url: string) => void;
+  onCopyToInput?: (text: string) => void;
 }
 
 /**
@@ -72,6 +74,7 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({
   className,
   streamMessages,
   onLinkDetected,
+  onCopyToInput,
 }) => {
   // State to track tool results mapped by tool call ID
   const [toolResults, setToolResults] = useState<Map<string, any>>(new Map());
@@ -374,8 +377,24 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({
 
       let renderedSomething = false;
 
+      // 提取用户消息的纯文本内容用于复制
+      const extractUserMessageText = (): string => {
+        if (typeof msg.content === "string") {
+          return msg.content;
+        }
+        if (Array.isArray(msg.content)) {
+          return msg.content
+            .filter((c: any) => c.type === "text")
+            .map((c: any) => c.text)
+            .join("\n");
+        }
+        return "";
+      };
+
+      const userMessageText = extractUserMessageText();
+
       const renderedCard = (
-        <Card className={cn("border-muted-foreground/20 bg-muted/20", className)}>
+        <Card className={cn("border-muted-foreground/20 bg-muted/20 group relative", className)}>
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <User className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -770,6 +789,22 @@ const StreamMessageComponent: React.FC<StreamMessageProps> = ({
                     return null;
                   })}
               </div>
+              
+              {/* 复制到输入框按钮 - 鼠标悬停时显示 */}
+              {onCopyToInput && userMessageText && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCopyToInput(userMessageText);
+                  }}
+                  title="复制到输入框"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

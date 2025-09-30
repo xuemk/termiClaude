@@ -5,6 +5,7 @@ export const zh: Translations = {
     save: "保存",
     cancel: "取消",
     delete: "删除",
+    deleting: "删除中...",
     edit: "编辑",
     add: "添加",
     remove: "移除",
@@ -97,6 +98,10 @@ export const zh: Translations = {
     runningClaudeSessions: "运行中的 Claude 会话",
     hooks: "钩子",
     projectSettings: "项目设置",
+    deleteProject: "删除项目",
+    deleteProjectTitle: "删除项目",
+    deleteProjectDescription: "确定要删除此项目吗？",
+    deleteWarning: "此操作将永久删除项目及其所有会话数据，无法恢复！",
   },
 
   sessions: {
@@ -146,6 +151,18 @@ export const zh: Translations = {
     copyAsJsonl: "复制为 JSONL",
     checkpointSettingsTooltip: "检查点设置",
     timelineNavigatorTooltip: "时间线导航器",
+    // Message selection and deletion
+    selectMessages: "选择消息",
+    selectMessagesToDelete: "选择要删除的消息",
+    selectAll: "全选",
+    deselectAll: "取消全选",
+    deleteMessages: "删除消息",
+    deleteMessagesConfirm: "删除消息",
+    deleteMessagesDesc: "您确定要删除 {count} 条消息吗？",
+    deleteMessagesWarning: "此操作无法撤销。",
+    deleteMessagesBackup: "删除前将创建备份。",
+    messagesDeleted: "成功删除 {count} 条消息",
+    failedToDeleteMessages: "删除消息失败。请重试。",
   },
 
   settings: {

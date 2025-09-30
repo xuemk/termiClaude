@@ -5,6 +5,7 @@ export const en: Translations = {
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
+    deleting: "Deleting...",
     edit: "Edit",
     add: "Add",
     remove: "Remove",
@@ -97,6 +98,10 @@ export const en: Translations = {
     runningClaudeSessions: "Running Claude Sessions",
     hooks: "Hooks",
     projectSettings: "Project Settings",
+    deleteProject: "Delete Project",
+    deleteProjectTitle: "Delete Project",
+    deleteProjectDescription: "Are you sure you want to delete this project?",
+    deleteWarning: "This will permanently delete the project and all its session data. This action cannot be undone!",
   },
 
   sessions: {
@@ -147,6 +152,18 @@ export const en: Translations = {
     copyAsJsonl: "Copy as JSONL",
     checkpointSettingsTooltip: "Checkpoint Settings",
     timelineNavigatorTooltip: "Timeline Navigator",
+    // Message selection and deletion
+    selectMessages: "Select Messages",
+    selectMessagesToDelete: "Select messages to delete",
+    selectAll: "Select All",
+    deselectAll: "Clear",
+    deleteMessages: "Delete Messages",
+    deleteMessagesConfirm: "Delete Messages",
+    deleteMessagesDesc: "Are you sure you want to delete {count} message(s)?",
+    deleteMessagesWarning: "This action cannot be undone.",
+    deleteMessagesBackup: "A backup will be created before deletion.",
+    messagesDeleted: "Successfully deleted {count} message(s)",
+    failedToDeleteMessages: "Failed to delete messages. Please try again.",
   },
 
   settings: {

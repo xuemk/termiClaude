@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Reorder } from 'framer-motion';
-import { X, Plus, MessageSquare, Bot, AlertCircle, Loader2, Folder, BarChart, Server, Settings, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Plus, MessageSquare, Bot, AlertCircle, Loader2, Folder, BarChart, Server, Settings, FileText, ChevronLeft, ChevronRight, Edit2 } from 'lucide-react';
 import { useTabState } from '@/hooks/useTabState';
 import { Tab } from '@/contexts/contexts';
 import { useTabContext } from '@/hooks';
@@ -19,6 +19,21 @@ interface TabItemProps {
 
 const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDragging = false, setDraggedTabId }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(tab.customTitle || tab.title);
+  const { updateTab } = useTabContext();
+
+  const handleSaveTitle = () => {
+    if (editTitle.trim()) {
+      updateTab(tab.id, { customTitle: editTitle.trim() });
+      setIsEditing(false);
+    } else {
+      setEditTitle(tab.customTitle || tab.title);
+      setIsEditing(false);
+    }
+  };
+
+  const displayTitle = tab.customTitle || tab.title;
 
   const getIcon = () => {
     switch (tab.type) {
@@ -93,9 +108,38 @@ const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDr
       </div>
 
       {/* Tab Title */}
-      <span className="flex-1 truncate text-xs font-medium min-w-0">
-        {tab.title}
-      </span>
+      {isEditing ? (
+        <input
+          type="text"
+          value={editTitle}
+          onChange={(e) => setEditTitle(e.target.value)}
+          onBlur={handleSaveTitle}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSaveTitle();
+            if (e.key === 'Escape') {
+              setEditTitle(tab.customTitle || tab.title);
+              setIsEditing(false);
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="flex-1 px-2 py-0.5 text-xs font-medium bg-background border border-primary rounded focus:outline-none focus:ring-1 focus:ring-primary min-w-0"
+          autoFocus
+        />
+      ) : (
+        <span 
+          className="flex-1 truncate text-xs font-medium min-w-0"
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (tab.type === 'chat' || tab.type === 'agent') {
+              setIsEditing(true);
+            }
+          }}
+          title={displayTitle}
+        >
+          {displayTitle}
+        </span>
+      )}
 
       {/* Status Indicators */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -112,23 +156,33 @@ const TabItem: React.FC<TabItemProps> = ({ tab, isActive, onClose, onClick, isDr
           />
         )}
 
-        {/* Close Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose(tab.id);
-          }}
-          className={cn(
-            "flex-shrink-0 w-4 h-4 flex items-center justify-center rounded-sm",
-            "transition-all duration-100 hover:bg-destructive/20 hover:text-destructive",
-            "focus:outline-none focus:ring-1 focus:ring-destructive/50",
-            (isHovered || isActive) ? "opacity-100" : "opacity-0"
-          )}
-          title={`Close ${tab.title}`}
-          tabIndex={-1}
-        >
-          <X className="w-3 h-3" />
-        </button>
+        {/* Edit button for chat/agent tabs */}
+        {isHovered && (tab.type === 'chat' || tab.type === 'agent') && !isEditing && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(true);
+            }}
+            className="w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-opacity"
+            title="Rename tab"
+          >
+            <Edit2 className="w-3 h-3" />
+          </button>
+        )}
+
+        {/* Close button */}
+        {isHovered && !isEditing && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose(tab.id);
+            }}
+            className="w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-muted rounded transition-opacity"
+            aria-label="Close tab"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
       </div>
     </Reorder.Item>
         </TooltipTrigger>

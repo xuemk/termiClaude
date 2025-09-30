@@ -5,6 +5,7 @@ export const es: Translations = {
     save: "Guardar",
     cancel: "Cancelar",
     delete: "Eliminar",
+    deleting: "Eliminando...",
     edit: "Editar",
     add: "Añadir",
     remove: "Quitar",
@@ -97,6 +98,10 @@ export const es: Translations = {
     runningClaudeSessions: "Sesiones de Claude en ejecución",
     hooks: "Hooks",
     projectSettings: "Configuración del proyecto",
+    deleteProject: "Eliminar proyecto",
+    deleteProjectTitle: "Eliminar proyecto",
+    deleteProjectDescription: "¿Estás seguro de que quieres eliminar este proyecto?",
+    deleteWarning: "Esto eliminará permanentemente el proyecto y todos los datos de sus sesiones. ¡Esta acción no se puede deshacer!",
   },
 
   sessions: {
@@ -148,6 +153,18 @@ export const es: Translations = {
     copyAsJsonl: "Copiar como JSONL",
     checkpointSettingsTooltip: "Configuración de Puntos de Control",
     timelineNavigatorTooltip: "Navegador de Línea de Tiempo",
+    // Message selection and deletion
+    selectMessages: "Seleccionar Mensajes",
+    selectMessagesToDelete: "Seleccionar mensajes para eliminar",
+    selectAll: "Seleccionar Todo",
+    deselectAll: "Limpiar",
+    deleteMessages: "Eliminar Mensajes",
+    deleteMessagesConfirm: "Eliminar Mensajes",
+    deleteMessagesDesc: "¿Está seguro de que desea eliminar {count} mensaje(s)?",
+    deleteMessagesWarning: "Esta acción no se puede deshacer.",
+    deleteMessagesBackup: "Se creará una copia de seguridad antes de la eliminación.",
+    messagesDeleted: "Se eliminaron exitosamente {count} mensaje(s)",
+    failedToDeleteMessages: "Error al eliminar mensajes. Por favor, inténtelo de nuevo.",
   },
 
   settings: {

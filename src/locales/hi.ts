@@ -5,6 +5,7 @@ export const hi: Translations = {
     save: "सहेजें",
     cancel: "रद्द करें",
     delete: "हटाएं",
+    deleting: "हटाया जा रहा है...",
     edit: "संपादित करें",
     add: "जोड़ें",
     remove: "हटाएं",
@@ -97,6 +98,10 @@ export const hi: Translations = {
     runningClaudeSessions: "चल रहे Claude सेशन",
     hooks: "हुक्स",
     projectSettings: "प्रोजेक्ट सेटिंग्स",
+    deleteProject: "प्रोजेक्ट हटाएं",
+    deleteProjectTitle: "प्रोजेक्ट हटाएं",
+    deleteProjectDescription: "क्या आप वाकई इस प्रोजेक्ट को हटाना चाहते हैं?",
+    deleteWarning: "यह प्रोजेक्ट और इसके सभी सेशन डेटा को स्थायी रूप से हटा देगा। इस क्रिया को पूर्ववत नहीं किया जा सकता!",
   },
 
   sessions: {
@@ -147,6 +152,18 @@ export const hi: Translations = {
     copyAsJsonl: "JSONL के रूप में कॉपी करें",
     checkpointSettingsTooltip: "चेकपॉइंट सेटिंग्स",
     timelineNavigatorTooltip: "टाइमलाइन नेविगेटर",
+    // Message selection and deletion
+    selectMessages: "संदेश चुनें",
+    selectMessagesToDelete: "हटाने के लिए संदेश चुनें",
+    selectAll: "सभी का चयन करें",
+    deselectAll: "साफ़ करें",
+    deleteMessages: "संदेश हटाएं",
+    deleteMessagesConfirm: "संदेश हटाएं",
+    deleteMessagesDesc: "क्या आप वाकई {count} संदेश हटाना चाहते हैं?",
+    deleteMessagesWarning: "यह क्रिया पूर्ववत नहीं की जा सकती।",
+    deleteMessagesBackup: "हटाने से पहले एक बैकअप बनाया जाएगा।",
+    messagesDeleted: "{count} संदेश सफलतापूर्वक हटा दिए गए",
+    failedToDeleteMessages: "संदेश हटाने में विफल। कृपया पुनः प्रयास करें।",
   },
 
   settings: {

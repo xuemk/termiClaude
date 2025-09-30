@@ -443,7 +443,7 @@ export const LSResultWidget: React.FC<{ content: string }> = ({ content }) => {
           return <FileCode className="h-3.5 w-3.5 text-cyan-500" />;
         case "sh":
         case "bash":
-          return <Terminal className="h-3.5 w-3.5 text-green-500" />;
+          return <Terminal className="h-3.5 w-3.5 text-green-400 dark:text-green-500" />;
         default:
           return <FileText className="h-3.5 w-3.5 text-muted-foreground" />;
       }
@@ -557,7 +557,8 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { theme } = useTheme();
-  const syntaxTheme = getClaudeSyntaxTheme(theme);
+  // 由于ReadResultWidget使用固定的黑色背景(bg-zinc-950)，在浅色模式下也需要使用暗色主题的亮色文字
+  const syntaxTheme = getClaudeSyntaxTheme(theme === 'light' ? 'dark' : theme);
 
   // Extract file extension for syntax highlighting
   const getLanguage = (path?: string) => {
@@ -664,18 +665,18 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
           <div className="rounded-lg overflow-hidden border bg-zinc-950 w-full ">
       <div className="px-4 py-2 border-b bg-zinc-900/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-mono text-muted-foreground">
+          <FileText className="h-3.5 w-3.5 text-zinc-300 dark:text-muted-foreground" />
+          <span className="text-xs font-mono text-zinc-200 dark:text-muted-foreground">
             {filePath || "File content"}
           </span>
           {isLargeFile && (
-            <span className="text-xs text-muted-foreground">({lineCount} lines)</span>
+            <span className="text-xs text-zinc-200 dark:text-muted-foreground">({lineCount} lines)</span>
           )}
         </div>
         {isLargeFile && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-xs text-zinc-200 dark:text-muted-foreground hover:text-white dark:hover:text-foreground transition-colors"
           >
             <ChevronRight
               className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")}
@@ -716,7 +717,7 @@ export const ReadResultWidget: React.FC<{ content: string; filePath?: string }> 
       )}
 
       {isLargeFile && !isExpanded && (
-        <div className="px-4 py-3 text-xs text-muted-foreground text-center bg-zinc-900/30">
+        <div className="px-4 py-3 text-xs text-zinc-200 dark:text-muted-foreground text-center bg-zinc-900/30">
           Click "Expand" to view the full file
         </div>
       )}
@@ -779,24 +780,24 @@ export const BashWidget: React.FC<{
   return (
     <div className="rounded-lg border bg-zinc-950 overflow-hidden">
       <div className="px-4 py-2 bg-zinc-900/50 flex items-center gap-2 border-b">
-        <Terminal className="h-3.5 w-3.5 text-green-500" />
-        <span className="text-xs font-mono text-muted-foreground">Terminal</span>
+        <Terminal className="h-3.5 w-3.5 text-green-400 dark:text-green-500" />
+        <span className="text-xs font-mono text-zinc-200 dark:text-muted-foreground">Terminal</span>
         {description && (
           <>
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">{description}</span>
+            <ChevronRight className="h-3 w-3 text-zinc-300 dark:text-muted-foreground" />
+            <span className="text-xs text-zinc-200 dark:text-muted-foreground">{description}</span>
           </>
         )}
         {/* Show loading indicator when no result yet */}
         {!result && (
-          <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-            <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+          <div className="ml-auto flex items-center gap-1 text-xs text-zinc-200 dark:text-muted-foreground">
+            <div className="h-2 w-2 bg-green-400 dark:bg-green-500 rounded-full animate-pulse" />
             <span>Running...</span>
           </div>
         )}
       </div>
       <div className="p-4 space-y-3">
-        <code className="text-xs font-mono text-green-400 block">$ {command}</code>
+        <code className="text-xs font-mono text-green-300 dark:text-green-400 block">$ {command}</code>
 
         {/* Show result if available */}
         {result ? (
@@ -804,8 +805,8 @@ export const BashWidget: React.FC<{
             className={cn(
               "mt-3 p-3 rounded-md border text-xs font-mono whitespace-pre-wrap overflow-x-auto",
               isError
-                ? "border-red-500/20 bg-red-500/5 text-red-400"
-                : "border-green-500/20 bg-green-500/5 text-green-300"
+                ? "border-red-500/20 bg-red-500/5 text-red-300 dark:text-red-400"
+                : "border-green-500/20 bg-green-500/5 text-green-200 dark:text-green-300"
             )}
           >
             {resultContent || (isError ? "Command failed" : "Command completed")}
@@ -826,7 +827,8 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
 }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const { theme } = useTheme();
-  const syntaxTheme = getClaudeSyntaxTheme(theme);
+  // 由于WriteWidget使用固定的黑色背景(bg-zinc-950)，在浅色模式下也需要使用暗色主题的亮色文字
+  const syntaxTheme = getClaudeSyntaxTheme(theme === 'light' ? 'dark' : theme);
 
   // Extract file extension for syntax highlighting
   const getLanguage = (path: string) => {
@@ -939,16 +941,16 @@ export const WriteWidget: React.FC<{ filePath: string; content: string; result?:
       }}
     >
       <div className="px-4 py-2 border-b bg-zinc-950 flex items-center justify-between sticky top-0 z-10">
-        <span className="text-xs font-mono text-muted-foreground">Preview</span>
+        <span className="text-xs font-mono text-zinc-200 dark:text-muted-foreground">Preview</span>
         {isLargeContent && truncated && (
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs whitespace-nowrap">
+            <Badge variant="outline" className="text-xs whitespace-nowrap text-zinc-200 dark:text-muted-foreground border-zinc-600">
               Truncated to 1000 chars
             </Badge>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6"
+              className="h-6 w-6 text-zinc-200 dark:text-muted-foreground hover:text-white dark:hover:text-foreground"
               onClick={() => setIsMaximized(true)}
             >
               <Maximize2 className="h-3 w-3" />
@@ -1084,10 +1086,10 @@ export const GrepWidget = ({
               {include && (
                 <div className="flex items-center gap-2 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <FilePlus className="h-3 w-3 text-green-500" />
-                    <span className="text-xs font-medium text-muted-foreground">Include</span>
+                    <FilePlus className="h-3 w-3 text-green-400 dark:text-green-500" />
+                    <span className="text-xs font-medium text-zinc-200 dark:text-muted-foreground">Include</span>
                   </div>
-                  <code className="font-mono text-xs bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-green-600 dark:text-green-400">
+                  <code className="font-mono text-xs bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded text-green-300 dark:text-green-400">
                     {include}
                   </code>
                 </div>
@@ -1149,24 +1151,24 @@ export const GrepWidget = ({
                           )}
                         >
                           <div className="flex items-center gap-2 min-w-[60px]">
-                            <FileText className="h-3.5 w-3.5 text-emerald-500" />
-                            <span className="text-xs font-mono text-emerald-400">
+                            <FileText className="h-3.5 w-3.5 text-emerald-400 dark:text-emerald-500" />
+                            <span className="text-xs font-mono text-emerald-300 dark:text-emerald-400">
                               {match.lineNumber}
                             </span>
                           </div>
 
                           <div className="flex-1 space-y-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-blue-400 truncate">
+                              <span className="text-xs font-medium text-blue-300 dark:text-blue-400 truncate">
                                 {fileName}
                               </span>
                               {dirPath && (
-                                <span className="text-xs text-muted-foreground truncate">
+                                <span className="text-xs text-zinc-300 dark:text-muted-foreground truncate">
                                   {dirPath}
                                 </span>
                               )}
                             </div>
-                            <code className="text-xs font-mono text-zinc-300 block whitespace-pre-wrap break-all">
+                            <code className="text-xs font-mono text-zinc-200 dark:text-zinc-300 block whitespace-pre-wrap break-all">
                               {match.content.trim()}
                             </code>
                           </div>
@@ -1242,7 +1244,8 @@ export const EditWidget: React.FC<{
   result?: unknown;
 }> = ({ file_path, old_string, new_string, result: _result }) => {
   const { theme } = useTheme();
-  const syntaxTheme = getClaudeSyntaxTheme(theme);
+  // 由于EditWidget使用固定的黑色背景(bg-zinc-950)，在浅色模式下也需要使用暗色主题的亮色文字
+  const syntaxTheme = getClaudeSyntaxTheme(theme === 'light' ? 'dark' : theme);
 
   const diffResult = Diff.diffLines(old_string || '', new_string || '', {
     newlineIsToken: true,
@@ -1269,7 +1272,7 @@ export const EditWidget: React.FC<{
               return (
                 <div
                   key={index}
-                  className="px-4 py-1 bg-zinc-900 border-y border-zinc-800 text-center text-zinc-500 text-xs"
+                  className="px-4 py-1 bg-zinc-900 border-y border-zinc-800 text-center text-zinc-400 dark:text-zinc-500 text-xs"
                 >
                   ... {part.count} unchanged lines ...
                 </div>
@@ -1282,9 +1285,9 @@ export const EditWidget: React.FC<{
               <div key={index} className={cn(partClass, "flex")}>
                 <div className="w-8 select-none text-center flex-shrink-0">
                   {part.added ? (
-                    <span className="text-green-400">+</span>
+                    <span className="text-green-300 dark:text-green-400">+</span>
                   ) : part.removed ? (
-                    <span className="text-red-400">-</span>
+                    <span className="text-red-300 dark:text-red-400">-</span>
                   ) : null}
                 </div>
                 <div className="flex-1">
@@ -1322,7 +1325,8 @@ export const EditWidget: React.FC<{
  */
 export const EditResultWidget: React.FC<{ content: string }> = ({ content }) => {
   const { theme } = useTheme();
-  const syntaxTheme = getClaudeSyntaxTheme(theme);
+  // 由于EditResultWidget使用固定的黑色背景(bg-zinc-950)，在浅色模式下也需要使用暗色主题的亮色文字
+  const syntaxTheme = getClaudeSyntaxTheme(theme === 'light' ? 'dark' : theme);
 
   // Parse the content to extract file path and code snippet
   const lines = content.split("\n");
@@ -1361,12 +1365,12 @@ export const EditResultWidget: React.FC<{ content: string }> = ({ content }) => 
   return (
     <div className="rounded-lg border bg-zinc-950 overflow-hidden">
       <div className="px-4 py-2 border-b bg-emerald-950/30 flex items-center gap-2">
-        <GitBranch className="h-3.5 w-3.5 text-emerald-500" />
-        <span className="text-xs font-mono text-emerald-400">Edit Result</span>
+        <GitBranch className="h-3.5 w-3.5 text-emerald-400 dark:text-emerald-500" />
+        <span className="text-xs font-mono text-emerald-300 dark:text-emerald-400">Edit Result</span>
         {filePath && (
           <>
-            <ChevronRight className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs font-mono text-muted-foreground">{filePath}</span>
+            <ChevronRight className="h-3 w-3 text-zinc-300 dark:text-muted-foreground" />
+            <span className="text-xs font-mono text-zinc-200 dark:text-muted-foreground">{filePath}</span>
           </>
         )}
       </div>
@@ -1411,7 +1415,8 @@ export const MCPWidget: React.FC<{
 }> = ({ toolName, input, result: _result }): React.ReactElement => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { theme } = useTheme();
-  const syntaxTheme = getClaudeSyntaxTheme(theme);
+  // 由于MCPWidget使用固定的黑色背景(bg-zinc-950)，在浅色模式下也需要使用暗色主题的亮色文字
+  const syntaxTheme = getClaudeSyntaxTheme(theme === 'light' ? 'dark' : theme);
 
   // Parse the tool name to extract components
   // Format: mcp__namespace__method
@@ -1526,8 +1531,8 @@ export const MCPWidget: React.FC<{
                   )}
                 >
                   <div className="px-3 py-2 border-b bg-zinc-900/50 flex items-center gap-2">
-                    <Code className="h-3 w-3 text-violet-500" />
-                    <span className="text-xs font-mono text-muted-foreground">Parameters</span>
+                    <Code className="h-3 w-3 text-violet-400 dark:text-violet-500" />
+                    <span className="text-xs font-mono text-zinc-200 dark:text-muted-foreground">Parameters</span>
                   </div>
                   <div
                     className={cn("overflow-auto", !isExpanded && isLargeInput && "max-h-[150px]")}
@@ -1674,14 +1679,14 @@ export const CommandOutputWidget: React.FC<{
     <div className="rounded-lg border bg-zinc-950/50 overflow-hidden">
       <div className="px-4 py-2 bg-zinc-900/50 flex items-center gap-2">
         <ChevronRight className="h-3 w-3 text-green-500" />
-        <span className="text-xs font-mono text-green-400">Output</span>
+        <span className="text-xs font-mono text-green-400 dark:text-green-400">Output</span>
       </div>
       <div className="p-3">
-        <pre className="text-sm font-mono text-zinc-300 whitespace-pre-wrap">
+        <pre className="text-sm font-mono text-zinc-200 dark:text-zinc-300 whitespace-pre-wrap">
           {output ? (
             parseAnsiToReact(output)
           ) : (
-            <span className="text-zinc-500 italic">No output</span>
+            <span className="text-zinc-400 dark:text-zinc-500 italic">No output</span>
           )}
         </pre>
       </div>
@@ -1729,18 +1734,19 @@ export const MultiEditWidget: React.FC<{
   const [isExpanded, setIsExpanded] = useState(false);
   const language = getLanguage(file_path);
   const { theme } = useTheme();
-  const syntaxTheme = getClaudeSyntaxTheme(theme);
+  // 由于MultiEditWidget使用固定的黑色背景(bg-zinc-950)，在浅色模式下也需要使用暗色主题的亮色文字
+  const syntaxTheme = getClaudeSyntaxTheme(theme === 'light' ? 'dark' : theme);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 mb-2">
-        <FileEdit className="h-4 w-4 text-muted-foreground" />
+        <FileEdit className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium">Using tool: MultiEdit</span>
       </div>
       <div className="ml-6 space-y-2">
         <div className="flex items-center gap-2">
-          <FileText className="h-3 w-3 text-blue-500" />
-          <code className="text-xs font-mono text-blue-500">{file_path}</code>
+          <FileText className="h-3 w-3 text-blue-400 dark:text-blue-500" />
+          <code className="text-xs font-mono text-blue-300 dark:text-blue-500">{file_path}</code>
         </div>
 
         <div className="space-y-1">
@@ -1764,7 +1770,7 @@ export const MultiEditWidget: React.FC<{
 
                 return (
                   <div key={index} className="space-y-1">
-                    <div className="text-xs font-medium text-muted-foreground">
+                    <div className="text-xs font-medium text-zinc-200 dark:text-muted-foreground">
                       Edit {index + 1}
                     </div>
                     <div className="rounded-lg border bg-zinc-950 overflow-hidden text-xs font-mono ">
@@ -1780,7 +1786,7 @@ export const MultiEditWidget: React.FC<{
                             return (
                               <div
                                 key={partIndex}
-                                className="px-4 py-1 bg-zinc-900 border-y border-zinc-800 text-center text-zinc-500 text-xs"
+                                className="px-4 py-1 bg-zinc-900 border-y border-zinc-800 text-center text-zinc-400 dark:text-zinc-500 text-xs"
                               >
                                 ... {part.count} unchanged lines ...
                               </div>
@@ -1795,9 +1801,9 @@ export const MultiEditWidget: React.FC<{
                             <div key={partIndex} className={cn(partClass, "flex")}>
                               <div className="w-8 select-none text-center flex-shrink-0">
                                 {part.added ? (
-                                  <span className="text-green-400">+</span>
+                                  <span className="text-green-300 dark:text-green-400">+</span>
                                 ) : part.removed ? (
-                                  <span className="text-red-400">-</span>
+                                  <span className="text-red-300 dark:text-red-400">-</span>
                                 ) : null}
                               </div>
                               <div className="flex-1">
@@ -1849,8 +1855,8 @@ export const MultiEditResultWidget: React.FC<{
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 rounded-t-md border-b border-green-500/20">
-          <GitBranch className="h-4 w-4 text-green-500" />
-          <span className="text-sm font-medium text-green-600 dark:text-green-400">
+          <GitBranch className="h-4 w-4 text-green-400 dark:text-green-500" />
+          <span className="text-sm font-medium text-green-300 dark:text-green-400">
             {edits.length} Changes Applied
           </span>
         </div>
@@ -1891,10 +1897,10 @@ export const MultiEditResultWidget: React.FC<{
                       key={`new-${lineIndex}`}
                       className="flex bg-green-500/10 border-l-4 border-green-500"
                     >
-                      <span className="w-12 px-2 py-1 text-green-600 dark:text-green-400 select-none text-right bg-green-500/10">
+                      <span className="w-12 px-2 py-1 text-green-300 dark:text-green-400 select-none text-right bg-green-500/10">
                         +{lineIndex + 1}
                       </span>
-                      <pre className="flex-1 px-3 py-1 text-green-700 dark:text-green-300 overflow-x-auto">
+                      <pre className="flex-1 px-3 py-1 text-green-200 dark:text-green-300 overflow-x-auto">
                         <code>{line || " "}</code>
                       </pre>
                     </div>

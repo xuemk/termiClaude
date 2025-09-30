@@ -5,6 +5,7 @@ export const ru: Translations = {
     save: "Сохранить",
     cancel: "Отмена",
     delete: "Удалить",
+    deleting: "Удаление...",
     edit: "Редактировать",
     add: "Добавить",
     remove: "Удалить",
@@ -97,6 +98,10 @@ export const ru: Translations = {
     runningClaudeSessions: "Запущенные сессии Claude",
     hooks: "Хуки",
     projectSettings: "Настройки проекта",
+    deleteProject: "Удалить проект",
+    deleteProjectTitle: "Удалить проект",
+    deleteProjectDescription: "Вы уверены, что хотите удалить этот проект?",
+    deleteWarning: "Это приведет к безвозвратному удалению проекта и всех данных его сессий. Это действие не может быть отменено!",
   },
 
   sessions: {
@@ -148,6 +153,18 @@ export const ru: Translations = {
     copyAsJsonl: "Копировать как JSONL",
     checkpointSettingsTooltip: "Настройки Контрольных Точек",
     timelineNavigatorTooltip: "Навигатор Временной Шкалы",
+    // Message selection and deletion
+    selectMessages: "Выбрать сообщения",
+    selectMessagesToDelete: "Выберите сообщения для удаления",
+    selectAll: "Выбрать все",
+    deselectAll: "Очистить",
+    deleteMessages: "Удалить сообщения",
+    deleteMessagesConfirm: "Удалить сообщения",
+    deleteMessagesDesc: "Вы уверены, что хотите удалить {count} сообщений?",
+    deleteMessagesWarning: "Это действие нельзя отменить.",
+    deleteMessagesBackup: "Перед удалением будет создана резервная копия.",
+    messagesDeleted: "Успешно удалено {count} сообщений",
+    failedToDeleteMessages: "Не удалось удалить сообщения. Пожалуйста, попробуйте снова.",
   },
 
   settings: {

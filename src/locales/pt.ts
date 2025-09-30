@@ -5,6 +5,7 @@ export const pt: Translations = {
     save: "Salvar",
     cancel: "Cancelar",
     delete: "Excluir",
+    deleting: "Excluindo...",
     edit: "Editar",
     add: "Adicionar",
     remove: "Remover",
@@ -97,6 +98,10 @@ export const pt: Translations = {
     runningClaudeSessions: "Sessões Claude em execução",
     hooks: "Hooks",
     projectSettings: "Configurações do projeto",
+    deleteProject: "Excluir projeto",
+    deleteProjectTitle: "Excluir projeto",
+    deleteProjectDescription: "Tem certeza de que deseja excluir este projeto?",
+    deleteWarning: "Isso excluirá permanentemente o projeto e todos os dados de suas sessões. Esta ação não pode ser desfeita!",
   },
 
   sessions: {
@@ -148,6 +153,18 @@ export const pt: Translations = {
     copyAsJsonl: "Copiar como JSONL",
     checkpointSettingsTooltip: "Configurações de Checkpoint",
     timelineNavigatorTooltip: "Navegador da Linha do Tempo",
+    // Message selection and deletion
+    selectMessages: "Selecionar Mensagens",
+    selectMessagesToDelete: "Selecionar mensagens para excluir",
+    selectAll: "Selecionar Tudo",
+    deselectAll: "Limpar",
+    deleteMessages: "Excluir Mensagens",
+    deleteMessagesConfirm: "Excluir Mensagens",
+    deleteMessagesDesc: "Tem certeza de que deseja excluir {count} mensagem(ns)?",
+    deleteMessagesWarning: "Esta ação não pode ser desfeita.",
+    deleteMessagesBackup: "Um backup será criado antes da exclusão.",
+    messagesDeleted: "{count} mensagem(ns) excluída(s) com sucesso",
+    failedToDeleteMessages: "Falha ao excluir mensagens. Por favor, tente novamente.",
   },
 
   settings: {

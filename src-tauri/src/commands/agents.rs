@@ -3088,12 +3088,8 @@ fn save_environment_variables_internal(
         [],
     );
     
-    // Create a unique index that allows same key in different groups
-    let _ = conn.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_env_vars_group_key 
-         ON environment_variables(COALESCE(group_id, 0), key)",
-        [],
-    );
+    // 移除旧的 UNIQUE 约束（允许同名 key 存在，只要不同时启用）
+    let _ = conn.execute("DROP INDEX IF EXISTS idx_env_vars_group_key", []);
     
     // Begin transaction
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
@@ -3102,41 +3098,19 @@ fn save_environment_variables_internal(
     tx.execute("DELETE FROM environment_variables", [])
         .map_err(|e| e.to_string())?;
     
-    // Validate and deduplicate environment variables before insertion
-    // Group variables by (group_id, key) to detect duplicates
-    let mut seen_keys: std::collections::HashMap<(Option<i64>, String), usize> = std::collections::HashMap::new();
-    let mut deduplicated_vars = Vec::new();
+    // 保存所有变量，允许同名 key 存在（前端控制启用时的重复检查）
+    log::debug!("Inserting {} environment variables", env_vars.len());
     
-    for (index, env_var) in env_vars.iter().enumerate() {
-        if !env_var.key.trim().is_empty() && !env_var.value.trim().is_empty() {
-            let key_tuple = (env_var.group_id, env_var.key.trim().to_string());
-            
-            if let Some(existing_index) = seen_keys.get(&key_tuple) {
-                log::warn!("Duplicate environment variable key '{}' found in group {} at indices {} and {}. Using the later one.", 
-                    env_var.key, env_var.group_id.unwrap_or(0), existing_index, index);
-                // Replace the existing one with the current one (keep the later one)
-                if let Some(existing_var) = deduplicated_vars.iter_mut().find(|(_, i)| *i == *existing_index) {
-                    existing_var.0 = env_var.clone();
-                }
-            } else {
-                seen_keys.insert(key_tuple, index);
-                deduplicated_vars.push((env_var.clone(), index));
-            }
+    for env_var in env_vars.iter() {
+        // 只要 key 不为空就保存，允许 value 为空和同名 key
+        if !env_var.key.trim().is_empty() {
+            tx.execute(
+                "INSERT INTO environment_variables (key, value, enabled, group_id, sort_order, created_at, updated_at) 
+                 VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                params![env_var.key.trim(), env_var.value.trim(), env_var.enabled, env_var.group_id, env_var.sort_order],
+            )
+            .map_err(|e| format!("Failed to insert environment variable '{}' in group {}: {}", env_var.key, env_var.group_id.unwrap_or(0), e))?;
         }
-    }
-    
-    log::debug!("Inserting {} deduplicated environment variables", deduplicated_vars.len());
-    
-    // Insert deduplicated environment variables
-    for (env_var, _) in deduplicated_vars {
-        // Use INSERT to ensure we respect the UNIQUE(group_id, key) constraint
-        // This allows same key names in different groups
-        tx.execute(
-            "INSERT INTO environment_variables (key, value, enabled, group_id, sort_order, created_at, updated_at) 
-             VALUES (?1, ?2, ?3, ?4, ?5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-            params![env_var.key.trim(), env_var.value.trim(), env_var.enabled, env_var.group_id, env_var.sort_order],
-        )
-        .map_err(|e| format!("Failed to insert environment variable '{}' in group {}: {}", env_var.key, env_var.group_id.unwrap_or(0), e))?;
     }
     
     // Commit transaction
@@ -3602,3 +3576,5 @@ pub async fn toggle_environment_variable_group_exclusive(
     log::info!("Environment variable group toggle completed successfully");
     Ok(groups)
 }
+
+

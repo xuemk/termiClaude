@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, ArrowLeft, Calendar, Clock, MessageSquare, Trash2 } from "lucide-react";
+import { FileText, ArrowLeft, Calendar, Clock, MessageSquare, Trash2, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
@@ -199,6 +199,7 @@ export const SessionList: React.FC<SessionListProps> = ({
   const handleDeleteClick = (e: React.MouseEvent, session: Session) => {
     e.preventDefault();
     e.stopPropagation(); // Prevent session click
+    e.nativeEvent.stopImmediatePropagation(); // 彻底阻止事件冒泡
     setSessionToDelete(session);
   };
 
@@ -219,6 +220,25 @@ export const SessionList: React.FC<SessionListProps> = ({
             {sessions.length} session{sessions.length !== 1 ? "s" : ""}
           </p>
         </div>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => {
+            // 直接打开一个新的空会话界面，session 将在用户发送第一条消息时创建
+            if (onSessionClick) {
+              onSessionClick({ 
+                id: '', // 空 ID 表示这是一个新会话
+                project_id: projectId,
+                project_path: projectPath,
+                created_at: Date.now() / 1000,
+              } as any);
+            }
+          }}
+          className="flex items-center gap-1"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="text-xs">新建对话</span>
+        </Button>
       </motion.div>
 
       {/* CLAUDE.md Memories Dropdown */}
@@ -314,17 +334,23 @@ export const SessionList: React.FC<SessionListProps> = ({
                         </div>
                       </div>
                       
-                      {/* Delete button */}
+                      {/* Delete button - 扩大点击区域 */}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 z-10 relative"
+                        className="h-10 w-10 text-muted-foreground hover:text-destructive hover:bg-destructive/10 z-10 relative flex-shrink-0"
                         onClick={(e) => handleDeleteClick(e, session)}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onMouseUp={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onMouseUp={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
                         data-delete-button="true"
                       >
-                        <Trash2 className="h-3 w-3" />
+                        <Trash2 className="h-5 w-5" style={{ pointerEvents: 'none' }} />
                       </Button>
                     </div>
                   </div>

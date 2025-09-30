@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -10,6 +10,10 @@ import {
   BarChart3,
   Shield,
   Trash,
+  HelpCircle,
+  Edit2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,13 +31,12 @@ import {
 } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { Toast, ToastContainer } from "@/components/ui/toast";
+import { Toast } from "@/components/ui/toast";
 import { ClaudeVersionSelector } from "./ClaudeVersionSelector";
 import { StorageTab } from "./StorageTab";
 import { HooksEditor } from "./HooksEditor";
 import { SlashCommandsManager } from "./SlashCommandsManager";
 import { ProxySettings } from "./ProxySettings";
-import { AnalyticsConsent } from "./AnalyticsConsent";
 import { useTheme, useTrackEvent } from "@/hooks";
 import { analytics } from "@/lib/analytics";
 import { logger } from "@/lib/logger";
@@ -55,6 +58,8 @@ import {
 } from "@/lib/popupNotification";
 import { notificationManager } from "@/lib/notificationManager";
 import { fontScaleManager, FONT_SCALE_OPTIONS, type FontScale } from "@/lib/fontScale";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 interface SettingsProps {
   /**
    * Callback to go back to the main view
@@ -141,17 +146,41 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
   // Analytics state
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [analyticsConsented, setAnalyticsConsented] = useState(false);
-  const [showAnalyticsConsent, setShowAnalyticsConsent] = useState(false);
   const trackEvent = useTrackEvent();
 
   // Message display mode state
   const [messageDisplayMode, setMessageDisplayMode] = useState<'both' | 'tool_calls_only'>('both');
   
   // Prompt input always visible state
-  const [promptInputAlwaysVisible, setPromptInputAlwaysVisible] = useState(() => {
-    const saved = localStorage.getItem('prompt-input-always-visible');
-    return saved === 'true';
-  });
+  const [promptInputAlwaysVisible, setPromptInputAlwaysVisible] = useState(false);
+
+  // Environment variables help dialog state
+  const [showEnvHelpDialog, setShowEnvHelpDialog] = useState(false);
+
+  // Environment group rename state
+  const [renamingGroupId, setRenamingGroupId] = useState<number | null>(null);
+  const [renameGroupValue, setRenameGroupValue] = useState<string>("");
+
+  // Environment group collapse state
+  // 4. 设置标签每次重新打开，所有分组都是折叠状态 - 不从localStorage读取
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<number>>(new Set());
+  
+  // Ref for environment groups container to support auto-scroll
+  const envGroupsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Toggle group collapse
+  const toggleGroupCollapse = (groupId: number) => {
+    setCollapsedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
+
   // 重新加载环境分组状态（用于实时同步）
   const reloadEnvironmentGroups = useCallback(async () => {
     try {
@@ -193,6 +222,22 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
     loadClaudeBinaryPath();
     loadAnalyticsSettings();
   }, []);
+
+  // 1&4. 初始化折叠状态：默认折叠所有分组
+  // 使用 ref 来跟踪是否已经初始化过
+  const hasInitializedCollapse = React.useRef(false);
+  
+  useEffect(() => {
+    if (envGroups.length > 0 && !hasInitializedCollapse.current) {
+      // 只在首次加载时折叠所有分组
+      const allGroupIds = envGroups.filter(g => g.id).map(g => g.id!);
+      if (allGroupIds.length > 0) {
+        setCollapsedGroups(new Set(allGroupIds));
+        hasInitializedCollapse.current = true;
+        logger.info(`Auto-collapsed all ${allGroupIds.length} groups on settings open`);
+      }
+    }
+  }, [envGroups.length]); // 只依赖length，避免每次envGroups更新都触发
 
   // 监听主界面环境分组切换事件，实时同步状态
   useEffect(() => {
@@ -628,6 +673,15 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
       sort_order: 0,
     };
     setEnvVars((prev) => [...prev, newVar]);
+    
+    // 2. 如果添加到分组，自动展开该分组
+    if (groupId) {
+      setCollapsedGroups(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(groupId);
+        return newSet;
+      });
+    }
   };
 
   /**
@@ -646,6 +700,68 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
       setNewGroupName("");
       setShowAddGroup(false);
       logger.info(`Created new environment variable group: ${newGroup.name}`);
+      
+      // 1. 折叠所有现有分组，只展开新创建的分组
+      if (newGroup.id !== undefined) {
+        const newGroupId: number = newGroup.id;
+        setCollapsedGroups(prev => {
+          const newSet = new Set(prev);
+          // 先添加所有现有分组到折叠集合
+          envGroups.forEach(g => {
+            if (g.id !== undefined) newSet.add(g.id);
+          });
+          // 然后移除新创建的分组（让它展开）
+          newSet.delete(newGroupId);
+          return newSet;
+        });
+      }
+      
+      // Auto-create default environment variables for the new group
+      if (newGroup.id) {
+        const defaultVars: DbEnvironmentVariable[] = [
+          {
+            key: "ANTHROPIC_BASE_URL",
+            value: "", // 空值，使用placeholder显示提示
+            enabled: true,
+            group_id: newGroup.id,
+            sort_order: 0,
+          },
+          {
+            key: "ANTHROPIC_AUTH_TOKEN",
+            value: "", // 空值，使用placeholder显示提示
+            enabled: true,
+            group_id: newGroup.id,
+            sort_order: 1,
+          },
+          {
+            key: "MID_1",
+            value: "", // 空值，使用placeholder显示提示
+            enabled: true,
+            group_id: newGroup.id,
+            sort_order: 2,
+          },
+        ];
+        
+        setEnvVars([...envVars, ...defaultVars]);
+        
+        // Save all default variables to database
+        try {
+          await api.saveEnvironmentVariables([...envVars, ...defaultVars]);
+          logger.info(`Created ${defaultVars.length} default environment variables for group ${newGroup.name}`);
+        } catch (error) {
+          logger.error("Failed to save default environment variables:", error);
+        }
+      }
+      
+      // 2. 自动滚动到底部，显示新创建的分组
+      setTimeout(() => {
+        if (envGroupsContainerRef.current) {
+          envGroupsContainerRef.current.scrollTo({
+            top: envGroupsContainerRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 100); // 延迟100ms确保DOM已更新
       
       // 触发环境分组更新事件，同步主界面下拉框状态
       window.dispatchEvent(new CustomEvent('environment-groups-updated'));
@@ -733,16 +849,21 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
    */
   const deleteEnvGroup = async (groupId: number) => {
     try {
+      // 后端会级联删除该分组的所有变量，所以前端也直接删除
       await api.deleteEnvironmentVariableGroup(groupId);
+      
+      // 更新分组列表
       setEnvGroups(groups => groups.filter(g => g.id !== groupId));
-      // Move variables from deleted group to ungrouped (null group_id)
-      setEnvVars(vars => 
-        vars.map(v => v.group_id === groupId ? { ...v, group_id: undefined } : v)
-      );
+      
+      // 直接删除该分组的变量（而不是移到未分组），避免闪烁
+      setEnvVars(vars => vars.filter(v => v.group_id !== groupId));
+      
       logger.info(`Deleted environment variable group with ID: ${groupId}`);
       
       // 触发环境分组更新事件，同步主界面下拉框状态
       window.dispatchEvent(new CustomEvent('environment-groups-updated'));
+      
+      setToast({ message: "分组已删除", type: "success" });
     } catch (error) {
       logger.error("Failed to delete environment variable group:", error);
       setToast({ message: "Failed to delete group", type: "error" });
@@ -750,18 +871,90 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
   };
 
   /**
+   * Start renaming a group
+   */
+  const startRenameGroup = (groupId: number, currentName: string) => {
+    setRenamingGroupId(groupId);
+    setRenameGroupValue(currentName);
+  };
+
+  /**
+   * Save the renamed group
+   */
+  const saveRenameGroup = async (groupId: number) => {
+    if (!renameGroupValue.trim()) {
+      setRenamingGroupId(null);
+      return;
+    }
+
+    try {
+      const group = envGroups.find(g => g.id === groupId);
+      if (!group) return;
+
+      await api.updateEnvironmentVariableGroup(
+        groupId,
+        renameGroupValue.trim(),
+        group.description,
+        group.enabled,
+        group.sort_order
+      );
+
+      setEnvGroups(groups => 
+        groups.map(g => g.id === groupId ? { ...g, name: renameGroupValue.trim() } : g)
+      );
+
+      setRenamingGroupId(null);
+      setRenameGroupValue("");
+      logger.info(`Renamed environment variable group ${groupId} to: ${renameGroupValue.trim()}`);
+      
+      // 触发环境分组更新事件，同步主界面下拉框状态
+      window.dispatchEvent(new CustomEvent('environment-groups-updated'));
+    } catch (error) {
+      logger.error("Failed to rename environment variable group:", error);
+      setToast({ message: "Failed to rename group", type: "error" });
+    }
+  };
+
+  /**
+   * Cancel renaming a group
+   */
+  const cancelRenameGroup = () => {
+    setRenamingGroupId(null);
+    setRenameGroupValue("");
+  };
+
+  /**
    * Updates an environment variable
    */
   /**
    * Check if an environment variable key is duplicated within the same group
+   * 检查输入时的重复（用于显示红框）
    */
   const isDuplicateKey = (currentIndex: number, key: string, groupId?: number) => {
+    if (!key.trim()) return false;
+    
+    const currentVar = envVars[currentIndex];
+    
+    return envVars.some((envVar, index) => 
+      index !== currentIndex && 
+      envVar.key.trim() === key.trim() && 
+      envVar.group_id === groupId &&
+      envVar.enabled && currentVar?.enabled  // 只有两个都启用时才显示红框
+    );
+  };
+
+  /**
+   * Check if enabling a variable would create a duplicate
+   * 检查启用时是否会与其他已启用的变量重复
+   */
+  const wouldCreateDuplicateOnEnable = (currentIndex: number, key: string, groupId?: number): boolean => {
     if (!key.trim()) return false;
     
     return envVars.some((envVar, index) => 
       index !== currentIndex && 
       envVar.key.trim() === key.trim() && 
-      envVar.group_id === groupId
+      envVar.group_id === groupId &&
+      envVar.enabled  // 检查是否有其他已启用的同名变量
     );
   };
 
@@ -773,9 +966,22 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
    * @param value - New value for the field
    */
   const updateEnvVar = async (index: number, field: "key" | "value" | "enabled", value: string | boolean) => {
-    // 如果是启用未分组变量，需要检查冲突
-    if (field === "enabled" && value === true) {
+    logger.info(`updateEnvVar: index=${index}, field=${field}, value=${value}`);
+    
       const envVar = envVars[index];
+    
+    // 如果是启用操作，检查是否会创建重复
+    if (field === "enabled" && value === true) {
+      if (wouldCreateDuplicateOnEnable(index, envVar.key, envVar.group_id)) {
+        setToast({ 
+          message: `无法启用：已存在启用的同名变量 "${envVar.key}"，请先修改变量名称`, 
+          type: "error" 
+        });
+        logger.warn(`Cannot enable duplicate key: ${envVar.key} in group ${envVar.group_id}`);
+        return; // 阻止启用操作
+      }
+      
+      // 如果是启用未分组变量，需要检查冲突
       if (!envVar.group_id && envVar.key.trim()) {
         await handleUngroupedVariableToggle(envVar.key.trim(), true);
       }
@@ -785,34 +991,15 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
       i === index ? { ...envVar, [field]: value } : envVar
     );
     
+    logger.info(`updateEnvVar: updatedVars[${index}].enabled =`, updatedVars[index]?.enabled);
+    
+    // 立即更新前端状态，允许用户看到输入
     setEnvVars(updatedVars);
     
-    // 验证数据一致性并保存到数据库
+    // 保存到数据库 - 允许同名key存在（只要不是都启用）
     try {
-      // 验证是否有重复键名
-      const seenKeys = new Map<string, DbEnvironmentVariable>();
-      const validatedVars: DbEnvironmentVariable[] = [];
-      
-      for (const envVar of updatedVars) {
-        const keyGroupKey = `${envVar.group_id || 0}-${envVar.key.trim()}`;
-        
-        if (seenKeys.has(keyGroupKey)) {
-          const existing = seenKeys.get(keyGroupKey)!;
-                     logger.warn(`Duplicate key found during update: ${envVar.key} in group ${envVar.group_id}. Existing value: "${existing.value}", New value: "${envVar.value}". Keeping existing.`);
-          continue; // 保留原有值，忽略重复项
-        } else {
-          seenKeys.set(keyGroupKey, envVar);
-          validatedVars.push(envVar);
-        }
-      }
-      
-      if (validatedVars.length !== updatedVars.length) {
-        logger.warn(`updateEnvVar: Removed ${updatedVars.length - validatedVars.length} duplicate environment variables`);
-        // 如果有重复项被移除，更新前端状态以保持一致
-        setEnvVars(validatedVars);
-      }
-      
-      await api.saveEnvironmentVariables(validatedVars);
+      await api.saveEnvironmentVariables(updatedVars);
+      logger.info(`Successfully saved ${updatedVars.length} environment variables`);
     } catch (error) {
       logger.error("Failed to save environment variable:", error);
       setToast({ message: "Failed to save environment variable", type: "error" });
@@ -1189,6 +1376,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                           onCheckedChange={(checked) =>
                             updateSetting("includeCoAuthoredBy", checked)
                           }
+                          variant="status-colors"
                         />
                       </div>
 
@@ -1204,6 +1392,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                           id="verbose"
                           checked={settings?.verbose === true}
                           onCheckedChange={(checked) => updateSetting("verbose", checked)}
+                          variant="status-colors"
                         />
                       </div>
 
@@ -1226,6 +1415,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                               detail: { alwaysVisible: checked } 
                             }));
                           }}
+                          variant="status-colors"
                         />
                       </div>
 
@@ -1491,15 +1681,21 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                         <Button 
                           variant="outline" 
                           size="sm" 
+                          onClick={() => setShowEnvHelpDialog(true)}
+                          className="gap-2"
+                          title="查看环境变量配置帮助"
+                        >
+                          <HelpCircle className="h-3 w-3" />
+                          {t.common.help}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
                           onClick={() => setShowAddGroup(!showAddGroup)} 
                           className="gap-2"
                         >
                           <Plus className="h-3 w-3" />
                           {t.settings.addGroup}
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => addEnvVar()} className="gap-2">
-                          <Plus className="h-3 w-3" />
-                          {t.settings.addVariable}
                         </Button>
                       </div>
                     </div>
@@ -1532,28 +1728,72 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                     )}
 
                     {/* Environment Variable Groups */}
-                    <div className="space-y-4">
+                    <div ref={envGroupsContainerRef} className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                       {/* Render grouped variables */}
                       {envGroups.map((group) => {
                         const groupVars = envVars.filter(v => v.group_id === group.id);
                         return (
                           <div key={group.id} className="border rounded-lg">
-                            <div className="flex items-center justify-between p-3 bg-muted/30 border-b">
-                              <div className="flex items-center gap-2">
+                            {/* 5. 点击header任何地方都能折叠/展开 */}
+                            <div 
+                              className="flex items-center justify-between p-3 bg-muted/30 border-b cursor-pointer hover:bg-muted/50 transition-colors"
+                              onClick={() => toggleGroupCollapse(group.id!)}
+                            >
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                {/* 折叠/展开按钮 */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleGroupCollapse(group.id!)}
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  title={collapsedGroups.has(group.id!) ? "展开分组" : "折叠分组"}
+                                >
+                                  {collapsedGroups.has(group.id!) ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronUp className="h-4 w-4" />
+                                  )}
+                                </Button>
                                 <Switch
                                   checked={group.enabled}
                                   onCheckedChange={(enabled) => toggleGroupEnabled(group.id!, enabled)}
                                   variant="status-colors"
                                   className="flex-shrink-0"
                                 />
+                                {renamingGroupId === group.id ? (
+                                  <Input
+                                    value={renameGroupValue}
+                                    onChange={(e) => setRenameGroupValue(e.target.value)}
+                                    onBlur={() => saveRenameGroup(group.id!)}
+                                    onFocus={(e) => e.target.select()}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') saveRenameGroup(group.id!);
+                                      if (e.key === 'Escape') cancelRenameGroup();
+                                    }}
+                                    className="h-7 text-sm font-medium"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <div className="flex items-center gap-2">
                                 <h4 className="font-medium">{group.name}</h4>
-                                {group.description && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => startRenameGroup(group.id!, group.name)}
+                                      className="h-6 w-6 p-0 hover:bg-muted"
+                                      title="Rename group"
+                                    >
+                                      <Edit2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                )}
+                                {group.description && !renamingGroupId && (
                                   <span className="text-sm text-muted-foreground">
                                     - {group.description}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1573,6 +1813,15 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                                 </Button>
                               </div>
                             </div>
+                            <AnimatePresence>
+                              {!collapsedGroups.has(group.id!) && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden"
+                                >
                             <div className="p-3 space-y-3">
                               {groupVars.length === 0 ? (
                                 <p className="text-xs text-muted-foreground py-2">
@@ -1599,20 +1848,29 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                                           className={cn(
                                             "font-mono text-sm",
                                             isDuplicateKey(globalIndex, envVar.key, envVar.group_id) && 
-                                            "border-red-500 focus:border-red-500 focus:ring-red-500",
+                                            "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-950/20",
                                             (!envVar.enabled || !group.enabled) && "opacity-60"
                                           )}
                                           disabled={!envVar.enabled}
                                         />
                                         {isDuplicateKey(globalIndex, envVar.key, envVar.group_id) && (
-                                          <div className="absolute -bottom-5 left-0 text-xs text-red-500">
-                                            Duplicate key in this group
+                                          <div className="absolute -bottom-5 left-0 text-xs text-red-500 font-medium flex items-center gap-1">
+                                            <AlertCircle className="h-3 w-3" />
+                                            <span>Duplicate key in this group - cannot save</span>
                                           </div>
                                         )}
                                       </div>
                                       <span className="text-muted-foreground">=</span>
                                       <Input
-                                        placeholder="value"
+                                        placeholder={
+                                          envVar.key === "ANTHROPIC_BASE_URL" ? "请填写URL地址" :
+                                          envVar.key === "ANTHROPIC_AUTH_TOKEN" ? "请填写apikey" :
+                                          envVar.key === "MID_1" ? "请填写模型1的名称" :
+                                          envVar.key.startsWith("MID_") ? `请填写模型${envVar.key.replace("MID_", "")}的名称` :
+                                          envVar.key.startsWith("MNAME_") ? `请填写模型${envVar.key.replace("MNAME_", "")}的显示名称` :
+                                          envVar.key.startsWith("MDESC_") ? `请填写模型${envVar.key.replace("MDESC_", "")}的描述` :
+                                          "value"
+                                        }
                                         value={envVar.value}
                                         onChange={(e) => updateEnvVar(globalIndex, "value", e.target.value)}
                                         className={cn(
@@ -1623,12 +1881,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                                       />
                                       <Switch
                                         checked={envVar.enabled}
-                                        onCheckedChange={(enabled) => updateEnvVar(globalIndex, "enabled", enabled)}
-                                        variant="high-contrast"
-                                        className={cn(
-                                          "flex-shrink-0",
-                                          !group.enabled && "opacity-60"
-                                        )}
+                                        onCheckedChange={(enabled) => {
+                                          updateEnvVar(globalIndex, "enabled", enabled);
+                                        }}
+                                        variant="status-colors"
+                                        className="flex-shrink-0"
                                       />
                                       <Button
                                         variant="ghost"
@@ -1643,6 +1900,9 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                                 })
                               )}
                             </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         );
                       })}
@@ -1666,15 +1926,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                                 />
                                 <h4 className="font-medium">{t.settings.ungroupedVariables}</h4>
                               </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addEnvVar()}
-                                className="gap-1"
-                              >
-                                <Plus className="h-3 w-3" />
-                                {t.settings.addVariable}
-                              </Button>
+                              {/* 3. 去掉非分组的添加变量按钮 */}
                             </div>
                             <div className="p-3 space-y-3">
                               {ungroupedVars.map((envVar) => {
@@ -1697,20 +1949,29 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                                         className={cn(
                                           "font-mono text-sm",
                                           isDuplicateKey(globalIndex, envVar.key, envVar.group_id) && 
-                                          "border-red-500 focus:border-red-500 focus:ring-red-500",
+                                          "border-red-500 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-950/20",
                                           (!envVar.enabled || !ungroupedEnabled) && "opacity-60"
                                         )}
                                         disabled={!envVar.enabled}
                                       />
                                       {isDuplicateKey(globalIndex, envVar.key, envVar.group_id) && (
-                                        <div className="absolute -bottom-5 left-0 text-xs text-red-500">
-                                          {t.settings.duplicateKeyInUngroupedVariables}
+                                        <div className="absolute -bottom-5 left-0 text-xs text-red-500 font-medium flex items-center gap-1">
+                                          <AlertCircle className="h-3 w-3" />
+                                          <span>Duplicate key in this group - cannot save</span>
                                         </div>
                                       )}
                                     </div>
                                     <span className="text-muted-foreground">=</span>
                                     <Input
-                                      placeholder="value"
+                                      placeholder={
+                                        envVar.key === "ANTHROPIC_BASE_URL" ? "请填写URL地址" :
+                                        envVar.key === "ANTHROPIC_AUTH_TOKEN" ? "请填写apikey" :
+                                        envVar.key === "MID_1" ? "请填写模型1的名称" :
+                                        envVar.key.startsWith("MID_") ? `请填写模型${envVar.key.replace("MID_", "")}的名称` :
+                                        envVar.key.startsWith("MNAME_") ? `请填写模型${envVar.key.replace("MNAME_", "")}的显示名称` :
+                                        envVar.key.startsWith("MDESC_") ? `请填写模型${envVar.key.replace("MDESC_", "")}的描述` :
+                                        "value"
+                                      }
                                       value={envVar.value}
                                       onChange={(e) => updateEnvVar(globalIndex, "value", e.target.value)}
                                       className={cn(
@@ -1721,13 +1982,11 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                                     />
                                     <Switch
                                       checked={envVar.enabled}
-                                      onCheckedChange={(enabled) => updateEnvVar(globalIndex, "enabled", enabled)}
-                                      variant="high-contrast"
-                                      className={cn(
-                                        "flex-shrink-0",
-                                        !ungroupedEnabled && "opacity-60"
-                                      )}
-                                      disabled={!ungroupedEnabled}
+                                      onCheckedChange={(enabled) => {
+                                        updateEnvVar(globalIndex, "enabled", enabled);
+                                      }}
+                                      variant="status-colors"
+                                      className="flex-shrink-0"
                                     />
                                     <Button
                                       variant="ghost"
@@ -2151,11 +2410,12 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
                         <Switch
                           id="analytics-enabled"
                           checked={analyticsEnabled}
-                          variant="high-contrast"
+                          variant="status-colors"
                           onCheckedChange={async (checked) => {
-                            if (checked && !analyticsConsented) {
-                              setShowAnalyticsConsent(true);
-                            } else if (checked) {
+                            if (checked) {
+                              if (!analyticsConsented) {
+                                setAnalyticsConsented(true);
+                              }
                               await analytics.enable();
                               setAnalyticsEnabled(true);
                               trackEvent.settingsChanged('analytics_enabled', true);
@@ -2226,22 +2486,135 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, className }) => {
         )}
       </div>
 
-      {/* Toast Notification */}
-      <ToastContainer>
+      {/* Toast Container */}
+      <AnimatePresence>
         {toast && (
-          <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onDismiss={() => setToast(null)}
+          />
         )}
-      </ToastContainer>
+      </AnimatePresence>
 
-      {/* Analytics Consent Dialog */}
-      <AnalyticsConsent
-        open={showAnalyticsConsent}
-        onOpenChange={setShowAnalyticsConsent}
-        onComplete={async () => {
-          await loadAnalyticsSettings();
-          setShowAnalyticsConsent(false);
-        }}
-      />
+      {/* Environment Variables Help Dialog */}
+      <Dialog open={showEnvHelpDialog} onOpenChange={setShowEnvHelpDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>环境变量配置说明</DialogTitle>
+            <DialogDescription>
+              了解如何配置环境变量以使用 termiClaude
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <h4 className="font-semibold mb-2">必需的环境变量</h4>
+              <div className="space-y-3 text-sm">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <code className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    ANTHROPIC_BASE_URL
+                  </code>
+                  <p className="mt-1 text-muted-foreground">
+                    Anthropic API 的基础 URL 地址。
+                    <br />
+                    <span className="text-xs">
+                      示例: https://api.anthropic.com
+                    </span>
+                  </p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <code className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    ANTHROPIC_AUTH_TOKEN
+                  </code>
+                  <p className="mt-1 text-muted-foreground">
+                    您的 Anthropic API 密钥，用于身份验证。
+                    <br />
+                    <span className="text-xs">
+                      可从 Anthropic 控制台获取
+                    </span>
+                  </p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <code className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    MID_1
+                  </code>
+                  <p className="mt-1 text-muted-foreground">
+                    模型的唯一标识符（必需）。这是主要使用的模型 ID。
+                    <br />
+                    <span className="text-xs">
+                      示例: claude-3-5-sonnet-20241022, claude-3-opus-20240229
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">可选的环境变量</h4>
+              <div className="space-y-3 text-sm">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <code className="font-mono font-semibold text-green-600 dark:text-green-400">
+                    MNAME_1
+                  </code>
+                  <p className="mt-1 text-muted-foreground">
+                    模型的显示名称（可选，默认使用 ID）。
+                    <br />
+                    <span className="text-xs">
+                      示例: Claude Sonnet, Claude Opus
+                    </span>
+                  </p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <code className="font-mono font-semibold text-green-600 dark:text-green-400">
+                    MDESC_1
+                  </code>
+                  <p className="mt-1 text-muted-foreground">
+                    模型的描述信息（可选）。
+                    <br />
+                    <span className="text-xs">
+                      示例: 平衡速度和智能的最佳选择
+                    </span>
+                  </p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <code className="font-mono font-semibold text-green-600 dark:text-green-400">
+                    MID_2, MID_3, ...
+                  </code>
+                  <p className="mt-1 text-muted-foreground">
+                    可以定义多个模型，使用递增的数字后缀。
+                    <br />
+                    <span className="text-xs">
+                      对应的可以添加 MNAME_2, MDESC_2 等
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-semibold mb-2">分组使用说明</h4>
+              <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
+                <li>创建分组后会自动添加默认的环境变量模板</li>
+                <li>同一时间只能启用一个环境变量分组</li>
+                <li>启用分组时会自动禁用其他分组</li>
+                <li>分组可以用于区分不同的 API 配置或项目</li>
+                <li>修改变量值后会自动保存到数据库</li>
+              </ul>
+            </div>
+
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                <strong>提示：</strong> 创建新分组时，系统会自动创建三个默认变量（ANTHROPIC_BASE_URL、ANTHROPIC_AUTH_TOKEN、MID_1），您只需填写正确的值即可。
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowEnvHelpDialog(false)}>
+              了解了
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

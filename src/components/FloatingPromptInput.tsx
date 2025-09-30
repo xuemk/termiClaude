@@ -50,6 +50,7 @@ interface FloatingPromptInputProps {
 
 export interface FloatingPromptInputRef {
   addImage: (imagePath: string) => void;
+  setPrompt: (text: string) => void;
 }
 
 
@@ -304,6 +305,15 @@ const FloatingPromptInputInner = (
     }
   }, []);
 
+  // 监听外部传入的 defaultModel 变化，实时同步
+  useEffect(() => {
+    if (defaultModel && defaultModel !== selectedModel && models.find(m => m.id === defaultModel)) {
+      logger.info(`[FloatingPromptInput] defaultModel changed from outside: ${selectedModel} -> ${defaultModel}`);
+      setSelectedModel(defaultModel);
+      updateModelInSettings(defaultModel);
+    }
+  }, [defaultModel]);
+
   // Set default model when models are loaded
   useEffect(() => {
     if (models.length > 0) {
@@ -373,6 +383,15 @@ const FloatingPromptInputInner = (
 
           return newPrompt;
         });
+      },
+      setPrompt: (text: string) => {
+        setPrompt(text);
+        // Focus the textarea and move cursor to end
+        globalThis.setTimeout(() => {
+          const target = isExpanded ? expandedTextareaRef.current : textareaRef.current;
+          target?.focus();
+          target?.setSelectionRange(text.length, text.length);
+        }, 0);
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
