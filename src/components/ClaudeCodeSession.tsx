@@ -1094,6 +1094,27 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       return;
     }
 
+    // CRITICAL FIX: Before starting new session, ensure any previous session is completely terminated
+    if (hasActiveSessionRef.current && claudeSessionId) {
+      logger.warn("[ClaudeCodeSession] Detected active session before new prompt, forcing cleanup");
+      try {
+        await api.cancelClaudeExecution(claudeSessionId);
+        
+        // Force cleanup of all session state
+        hasActiveSessionRef.current = false;
+        isListeningRef.current = false;
+        setQueuedPrompts([]);
+        queuedPromptsRef.current = [];
+        
+        // Wait a moment for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        logger.info("[ClaudeCodeSession] Previous session cleanup completed");
+      } catch (err) {
+        logger.error("[ClaudeCodeSession] Failed to cleanup previous session:", err);
+      }
+    }
+
     try {
       setIsLoading(true);
       setError(null);
@@ -1157,12 +1178,41 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             }
           );
 
+          const specificCancelUnlisten = await listen<boolean>(
+            `claude-cancelled:${sid}`,
+            (evt) => {
+              logger.debug("[ClaudeCodeSession] Received claude-cancelled (scoped):", evt.payload);
+              
+              // Force stop all session state immediately
+              setIsLoading(false);
+              hasActiveSessionRef.current = false;
+              isListeningRef.current = false;
+              setError(null);
+              
+              // Clear all queued prompts to prevent continuation
+              setQueuedPrompts([]);
+              queuedPromptsRef.current = [];
+              
+              // Add cancellation message to UI
+              const cancelMessage: ClaudeStreamMessage = {
+                type: "system",
+                subtype: "info",
+                result: "会话已被用户取消",
+                timestamp: new Date().toISOString(),
+              };
+              setMessages((prev) => [...prev, cancelMessage]);
+              
+              logger.info("[ClaudeCodeSession] Scoped session state forcefully reset due to cancellation");
+            }
+          );
+
           // Replace existing unlisten refs with these new ones (after cleaning up)
           unlistenRefs.current.forEach((u) => u());
           unlistenRefs.current = [
             specificOutputUnlisten,
             specificErrorUnlisten,
             specificCompleteUnlisten,
+            specificCancelUnlisten,
           ];
         };
 
@@ -1418,11 +1468,38 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           processComplete(evt.payload);
         });
 
+        // Add cancel event listener to handle stop button properly
+        const genericCancelUnlisten = await listen<boolean>("claude-cancelled", (evt) => {
+          logger.debug("[ClaudeCodeSession] Received claude-cancelled (generic):", evt.payload);
+          
+          // Force stop all session state immediately
+          setIsLoading(false);
+          hasActiveSessionRef.current = false;
+          isListeningRef.current = false;
+          setError(null);
+          
+          // Clear all queued prompts to prevent continuation
+          setQueuedPrompts([]);
+          queuedPromptsRef.current = [];
+          
+          // Add cancellation message to UI
+          const cancelMessage: ClaudeStreamMessage = {
+            type: "system",
+            subtype: "info",
+            result: "会话已被用户取消",
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, cancelMessage]);
+          
+          logger.info("[ClaudeCodeSession] Session state forcefully reset due to cancellation");
+        });
+
         // Store the generic unlisteners for now; they may be replaced later.
         unlistenRefs.current = [
           genericOutputUnlisten,
           genericErrorUnlisten,
           genericCompleteUnlisten,
+          genericCancelUnlisten,
         ];
 
         // --------------------------------------------------------------------
@@ -1643,6 +1720,13 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       const sessionStartTimeLocal = messages.length > 0 ? (Number(messages[0].timestamp) || Date.now()) : Date.now();
       const duration = Date.now() - sessionStartTimeLocal;
 
+      // Force immediate UI state reset to prevent new prompts
+      setIsLoading(false);
+      hasActiveSessionRef.current = false;
+      isListeningRef.current = false;
+      setQueuedPrompts([]);
+      queuedPromptsRef.current = [];
+
       await api.cancelClaudeExecution(claudeSessionId);
 
       // Calculate metrics for enhanced analytics
@@ -1709,8 +1793,9 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       isListeningRef.current = false;
       setError(null);
 
-      // Clear queued prompts
+      // Clear queued prompts (both state and ref)
       setQueuedPrompts([]);
+      queuedPromptsRef.current = [];
 
       // Add a message indicating the session was cancelled
       const cancelMessage: ClaudeStreamMessage = {
@@ -1742,6 +1827,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       hasActiveSessionRef.current = false;
       isListeningRef.current = false;
       setError(null);
+      
+      // Clear queued prompts even on error
+      setQueuedPrompts([]);
+      queuedPromptsRef.current = [];
     }
   };
 
@@ -1901,6 +1990,10 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       unlistenRefs.current.forEach((unlisten) => unlisten());
       unlistenRefs.current = [];
       isListeningRef.current = false;
+      
+      // Clear any remaining queued prompts to prevent continuation
+      setQueuedPrompts([]);
+      queuedPromptsRef.current = [];
 
       // Don't automatically cancel session on component unmount
       // Session will only be cancelled when tab is actually closed (via tab-cleanup event)
