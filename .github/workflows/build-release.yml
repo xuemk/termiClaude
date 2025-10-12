@@ -42,20 +42,20 @@ jobs:
           #   bundle-type: rpm
           #   bundle-pattern: "*.rpm"
           #   file-suffix: rpm
-          - name: Windows MSI
-            os: windows-latest
-            rust-target: x86_64-pc-windows-msvc
-            artifact-name: windows-x86_64-msi
-            bundle-type: msi
-            bundle-pattern: "*.msi"
-            file-suffix: msi
-          - name: Windows EXE
-            os: windows-latest
-            rust-target: x86_64-pc-windows-msvc
-            artifact-name: windows-x86_64-exe
-            bundle-type: nsis
-            bundle-pattern: "*.exe"
-            file-suffix: exe
+          #- name: Windows MSI
+          #  os: windows-latest
+          #  rust-target: x86_64-pc-windows-msvc
+          # artifact-name: windows-x86_64-msi
+          #  bundle-type: msi
+          #  bundle-pattern: "*.msi"
+          #  file-suffix: msi
+          #- name: Windows EXE
+          #  os: windows-latest
+          #  rust-target: x86_64-pc-windows-msvc
+          #  artifact-name: windows-x86_64-exe
+          #  bundle-type: nsis
+          #  bundle-pattern: "*.exe"
+          #  file-suffix: exe
           - name: macOS Intel
             os: macos-13
             rust-target: x86_64-apple-darwin
