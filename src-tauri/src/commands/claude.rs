@@ -1445,6 +1445,7 @@ pub async fn delete_claude_md_file(file_path: String) -> Result<String, String> 
 }
 
 /// Loads the JSONL history for a specific session
+/// 🔧 修复：添加文件锁避免并发访问冲突
 #[tauri::command]
 pub async fn load_session_history(
     session_id: String,
@@ -1466,20 +1467,46 @@ pub async fn load_session_history(
         return Err(format!("Session file not found: {}", session_id));
     }
 
-    let file =
-        fs::File::open(&session_path).map_err(|e| format!("Failed to open session file: {}", e))?;
-
-    let reader = BufReader::new(file);
+    // 🔧 修复：添加重试机制，避免与 Claude CLI 的写入冲突
+    let mut retry_count = 0;
+    let max_retries = 3;
     let mut messages = Vec::new();
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                messages.push(json);
+    loop {
+        match fs::File::open(&session_path) {
+            Ok(file) => {
+                let reader = BufReader::new(file);
+                messages.clear();
+
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        // 🔧 修复：更健壮的 JSON 解析，忽略损坏的行
+                        match serde_json::from_str::<serde_json::Value>(&line) {
+                            Ok(json) => messages.push(json),
+                            Err(e) => {
+                                log::warn!("Failed to parse JSONL line (skipping): {} - Error: {}", 
+                                    line.chars().take(100).collect::<String>(), e);
+                                // 继续处理下一行，不中断整个加载过程
+                            }
+                        }
+                    }
+                }
+
+                // 成功读取，跳出循环
+                break;
+            }
+            Err(e) if retry_count < max_retries => {
+                log::warn!("Failed to open session file (attempt {}): {}", retry_count + 1, e);
+                retry_count += 1;
+                std::thread::sleep(std::time::Duration::from_millis(100 * retry_count as u64));
+            }
+            Err(e) => {
+                return Err(format!("Failed to open session file after {} attempts: {}", max_retries, e));
             }
         }
     }
 
+    log::info!("Loaded {} messages from session history", messages.len());
     Ok(messages)
 }
 

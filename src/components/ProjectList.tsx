@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { api, type Project } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
+import { cn, normalizePath } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date-utils";
 import { Pagination } from "@/components/ui/pagination";
 import { logger } from "@/lib/logger";
@@ -287,7 +287,7 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                   </div>
 
                                       <p className="text-xs text-muted-foreground mb-2 font-mono truncate">
-                    {project.path}
+                    {normalizePath(project.path)}
                   </p>
                 </div>
 
@@ -308,14 +308,27 @@ export const ProjectList: React.FC<ProjectListProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0"
+                        className="h-7 w-7 p-0 z-10 relative"
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
-                          onProjectSettings(project);
+                          console.log('[ProjectSettings] 点击设置按钮:', project.path);
+                          console.log('[ProjectSettings] onProjectSettings:', onProjectSettings);
+                          console.log('[ProjectSettings] project对象:', project);
+                          console.log('[ProjectSettings] 准备调用 onProjectSettings...');
+                          
+                          // 直接调用，不用 try-catch 看看是否有错误
+                          const result = onProjectSettings(project);
+                          console.log('[ProjectSettings] onProjectSettings 返回值:', result);
+                          console.log('[ProjectSettings] 调用完成');
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          console.log('[ProjectSettings] mouseDown事件');
                         }}
                         title={t.projects.hooks}
                       >
-                        <Settings className="h-3.5 w-3.5" />
+                        <Settings className="h-3.5 w-3.5 pointer-events-none" />
                       </Button>
                     )}
                       <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />

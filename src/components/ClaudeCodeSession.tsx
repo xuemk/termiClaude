@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api, type Session, type EnvironmentVariableGroup } from "@/lib/api";
 import { type ClaudeModel } from "@/types/models";
-import { cn } from "@/lib/utils";
+import { cn, normalizePath } from "@/lib/utils";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { StreamMessage } from "./StreamMessage";
@@ -51,6 +51,19 @@ import { handleError, handleApiError, handleValidationError } from "@/lib/errorH
 import { notificationManager } from "@/lib/notificationManager";
 import { useTrackEvent, useComponentMetrics, useWorkflowTracking, useMessageDisplayMode } from "@/hooks";
 // import { createDebouncedUpdater } from "@/lib/streamOptimization";
+import {
+  logSessionStateChange,
+  logEventListener,
+  logSessionIdChange,
+  logMessageSend,
+  logMessageReceive,
+  logSessionHistoryLoad,
+  logComponentLifecycle,
+  logApiCall,
+  generateComponentId,
+  checkSessionConnection,
+  printDiagnosticSummary,
+} from "@/lib/sessionDiagnostics";
 interface ClaudeCodeSessionProps {
   /**
    * Optional session to resume (when clicking from SessionList)
@@ -109,7 +122,28 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   onStreamingChange,
 }) => {
   const { t } = useI18n();
-  const [projectPath, setProjectPath] = useState(initialProjectPath || session?.project_path || "");
+  
+  // 🔍 诊断：生成组件唯一ID用于追踪
+  const componentIdRef = useRef(generateComponentId('ClaudeCodeSession'));
+  
+  // 🔧 修复：初始化时就规范化路径格式
+  const initialPath = initialProjectPath || session?.project_path || "";
+  const [projectPathRaw, setProjectPathRaw] = useState(normalizePath(initialPath));
+  
+  // 🔧 修复：包装 setProjectPath 确保所有路径都被规范化
+  const setProjectPath = useCallback((path: string) => {
+    const normalized = normalizePath(path);
+    if (normalized !== path) {
+      console.warn(
+        '%c[PATH_FIX] 路径已自动规范化',
+        'color: #FFC107; font-weight: bold;',
+        { original: path, normalized }
+      );
+    }
+    setProjectPathRaw(normalized);
+  }, []);
+  
+  const projectPath = projectPathRaw;
   const [messages, setMessages] = useState<ClaudeStreamMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,10 +240,77 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
   // const aiTracking = useAIInteractionTracking('sonnet'); // Default model
   const workflowTracking = useWorkflowTracking('claude_session');
 
+  // 🔍 诊断：组件挂载和卸载日志
+  useEffect(() => {
+    printDiagnosticSummary();
+    logComponentLifecycle('ClaudeCodeSession', 'mount', claudeSessionId, {
+      componentId: componentIdRef.current,
+      sessionProp: session?.id,
+      initialProjectPath,
+      projectPath,
+    });
+    
+    return () => {
+      logComponentLifecycle('ClaudeCodeSession', 'unmount', claudeSessionId, {
+        componentId: componentIdRef.current,
+        messageCount: messages.length,
+      });
+    };
+  }, []); // 只在挂载和卸载时执行
+
   // Keep ref in sync with state
   useEffect(() => {
     queuedPromptsRef.current = queuedPrompts;
   }, [queuedPrompts]);
+
+  // 🔍 诊断：监控会话ID变化
+  useEffect(() => {
+    logSessionIdChange(
+      null,
+      claudeSessionId,
+      'claudeSessionId state changed',
+      componentIdRef.current
+    );
+    
+    logSessionStateChange('Session ID Updated', {
+      sessionId: claudeSessionId,
+      projectPath,
+      messageCount: messages.length,
+      isStreaming: isLoading,
+      isLoading,
+      timestamp: Date.now(),
+      componentId: componentIdRef.current,
+    });
+  }, [claudeSessionId]);
+
+  // 🔍 诊断：监控消息数组变化
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    logSessionStateChange('Messages Updated', {
+      sessionId: claudeSessionId,
+      projectPath,
+      messageCount: messages.length,
+      isStreaming: isLoading,
+      isLoading,
+      timestamp: Date.now(),
+      componentId: componentIdRef.current,
+    }, {
+      lastMessageType: lastMessage?.type,
+      lastMessagePreview: lastMessage ? JSON.stringify(lastMessage).substring(0, 100) : 'none',
+    });
+  }, [messages.length]);
+
+  // 🔍 诊断：定期会话健康检查
+  useEffect(() => {
+    if (!claudeSessionId) return;
+    
+    // 每30秒检查一次会话状态
+    const interval = setInterval(async () => {
+      await checkSessionConnection(claudeSessionId, api);
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [claudeSessionId]);
 
   // Get effective session info (from prop or extracted) - use useMemo to ensure it updates
   const effectiveSession = useMemo(() => {
@@ -686,10 +787,20 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
   const loadSessionHistory = useCallback(async () => {
     if (!session?.id) {
+      // 🔍 诊断：记录无会话ID的情况
+      logSessionHistoryLoad('no-session-id', undefined, false, 0, 'No session ID provided');
       logger.debug("[ClaudeCodeSession] No session ID, clearing messages");
       setMessages([]);
       return;
     }
+
+    // 🔍 诊断：记录开始加载历史
+    const currentSessionId = session.id; // 捕获当前会话ID用于验证
+    logApiCall('loadSessionHistory', { 
+      sessionId: session.id, 
+      projectId: session.project_id,
+      componentId: componentIdRef.current,
+    }, true);
 
     // Always show loading for history load to give user feedback
     setIsLoading(true);
@@ -730,23 +841,54 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       
       logger.debug("[ClaudeCodeSession] Loaded", parsedMessages.length, "messages from", lines.length, "lines");
       
+      // 🔍 诊断：验证会话ID是否仍然匹配
+      if (session?.id !== currentSessionId) {
+        logSessionHistoryLoad(
+          currentSessionId,
+          session?.project_id,
+          false,
+          0,
+          'Session ID changed during load'
+        );
+        logger.warn("[ClaudeCodeSession] Session ID changed during history load, discarding results");
+        return;
+      }
+      
+      // 🔍 诊断：记录加载成功
+      logSessionHistoryLoad(
+        session.id,
+        session.project_id,
+        true,
+        parsedMessages.length
+      );
+      
       // Only update messages if component is still mounted
       if (isMountedRef.current) {
         setMessages(parsedMessages);
 
       }
     } catch (err) {
+      // 🔍 诊断：记录加载失败
+      logSessionHistoryLoad(
+        session?.id || 'unknown',
+        session?.project_id,
+        false,
+        0,
+        err
+      );
+      logApiCall('loadSessionHistory', { sessionId: session?.id }, false, undefined, err);
+      
       logger.error("[ClaudeCodeSession] Failed to load session history:", err);
       if (isMountedRef.current) {
         setError(`Failed to load session history: ${err instanceof Error ? err.message : 'Unknown error'}`);
         await handleApiError(err as Error, {
           operation: "loadSessionHistory",
           component: "ClaudeCodeSession",
-          sessionId: session.id,
+          sessionId: session?.id,
         });
       }
     } finally {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && session?.id === currentSessionId) {
         setIsLoading(false);
       }
     }
@@ -1018,6 +1160,7 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
       });
 
       if (selected) {
+        // setProjectPath 会自动规范化路径
         setProjectPath(selected as string);
         setError(null);
       }
@@ -1128,13 +1271,21 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
     logger.info("[ClaudeCodeSession] Environment and model refresh triggered");
   };
 
-  // 生成对话上下文摘要，用于resume失败时的后备方案
+  // 🔧 修复：生成完整的对话上下文摘要，包含工具调用历史
   const generateContextSummary = useCallback((messages: ClaudeStreamMessage[]): string => {
     if (messages.length === 0) return "";
     
     let summary = "# 继续对话上下文\n\n";
-    let conversationPairs: Array<{user: string, assistant: string}> = [];
-    let currentPair: {user?: string, assistant?: string} = {};
+    summary += "> ⚠️ 注意：由于会话中断，以下是从历史记录恢复的上下文摘要。\n\n";
+    
+    let conversationPairs: Array<{user: string, assistant: string, tools: string[]}> = [];
+    let currentPair: {user?: string, assistant?: string, tools: string[]} = { tools: [] };
+    
+    // 统计工具调用
+    let filesCreated: string[] = [];
+    let filesModified: string[] = [];
+    let filesDeleted: string[] = [];
+    let commandsExecuted: string[] = [];
     
     for (const message of messages) {
       if (message.type === 'user' && message.message?.content) {
@@ -1154,14 +1305,45 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           currentPair.user = userText.trim();
         }
       } else if (message.type === 'assistant' && message.message?.content) {
-        // 提取助手回复文本
+        // 提取助手回复文本和工具调用
         let assistantText = "";
+        let toolCalls: string[] = [];
+        
         if (Array.isArray(message.message.content)) {
+          // 提取文本内容
           const textParts = message.message.content
             .filter((c: any) => c.type === 'text')
             .map((c: any) => c.text || "")
             .join(" ");
           assistantText = textParts;
+          
+          // 🔧 关键修复：提取工具调用
+          const toolUseParts = message.message.content.filter((c: any) => c.type === 'tool_use');
+          toolUseParts.forEach((tool: any) => {
+            const toolName = tool.name || 'unknown';
+            const toolInput = tool.input || {};
+            
+            // 记录文件操作
+            if (toolName === 'write_file' || toolName === 'create_file') {
+              const filePath = toolInput.path || toolInput.file_path || 'unknown';
+              filesCreated.push(filePath);
+              toolCalls.push(`创建文件: ${filePath}`);
+            } else if (toolName === 'edit_file' || toolName === 'modify_file') {
+              const filePath = toolInput.path || toolInput.file_path || 'unknown';
+              filesModified.push(filePath);
+              toolCalls.push(`修改文件: ${filePath}`);
+            } else if (toolName === 'delete_file') {
+              const filePath = toolInput.path || toolInput.file_path || 'unknown';
+              filesDeleted.push(filePath);
+              toolCalls.push(`删除文件: ${filePath}`);
+            } else if (toolName === 'execute_command' || toolName === 'run_command') {
+              const command = toolInput.command || 'unknown';
+              commandsExecuted.push(command);
+              toolCalls.push(`执行命令: ${command}`);
+            } else {
+              toolCalls.push(`调用工具: ${toolName}`);
+            }
+          });
         } else if (typeof message.message.content === 'string') {
           assistantText = message.message.content;
         }
@@ -1170,24 +1352,66 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
           currentPair.assistant = assistantText.trim();
         }
         
+        if (toolCalls.length > 0) {
+          currentPair.tools.push(...toolCalls);
+        }
+        
         // 如果有完整的对话对，保存并重置
         if (currentPair.user && currentPair.assistant) {
           conversationPairs.push({
             user: currentPair.user,
-            assistant: currentPair.assistant
+            assistant: currentPair.assistant,
+            tools: currentPair.tools
           });
-          currentPair = {};
+          currentPair = { tools: [] };
         }
       }
     }
     
-    // 生成摘要
+    // 生成摘要 - 先显示工具调用统计
+    if (filesCreated.length > 0 || filesModified.length > 0 || filesDeleted.length > 0 || commandsExecuted.length > 0) {
+      summary += "## 📁 项目操作历史\n\n";
+      
+      if (filesCreated.length > 0) {
+        summary += `**创建的文件** (${filesCreated.length}):\n`;
+        filesCreated.slice(0, 10).forEach(f => summary += `- ${f}\n`);
+        if (filesCreated.length > 10) summary += `- ... 还有 ${filesCreated.length - 10} 个文件\n`;
+        summary += "\n";
+      }
+      
+      if (filesModified.length > 0) {
+        summary += `**修改的文件** (${filesModified.length}):\n`;
+        filesModified.slice(0, 10).forEach(f => summary += `- ${f}\n`);
+        if (filesModified.length > 10) summary += `- ... 还有 ${filesModified.length - 10} 个文件\n`;
+        summary += "\n";
+      }
+      
+      if (commandsExecuted.length > 0) {
+        summary += `**执行的命令** (${commandsExecuted.length}):\n`;
+        commandsExecuted.slice(0, 5).forEach(c => summary += `- \`${c}\`\n`);
+        if (commandsExecuted.length > 5) summary += `- ... 还有 ${commandsExecuted.length - 5} 个命令\n`;
+        summary += "\n";
+      }
+      
+      summary += "---\n\n";
+    }
+    
+    // 生成对话摘要
     if (conversationPairs.length > 0) {
-      summary += "请基于以下历史对话继续讨论：\n\n";
+      summary += "## 💬 对话历史\n\n";
+      summary += "请基于以下历史对话和项目操作继续讨论：\n\n";
+      
       conversationPairs.forEach((pair, index) => {
         summary += `**对话${index + 1}**\n`;
         summary += `用户：${pair.user}\n\n`;
         summary += `助手：${pair.assistant}\n\n`;
+        
+        if (pair.tools.length > 0) {
+          summary += `操作：\n`;
+          pair.tools.forEach(tool => summary += `  - ${tool}\n`);
+          summary += "\n";
+        }
+        
         summary += "---\n\n";
       });
       
@@ -1196,6 +1420,8 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
         summary += `**待回复**\n用户：${currentPair.user}\n\n---\n\n`;
       }
     }
+    
+    summary += "\n> 💡 提示：上述是从历史记录恢复的上下文摘要。如果需要查看具体文件内容，请使用 read_file 工具。\n\n";
     
     return summary;
   }, []);
@@ -1207,6 +1433,45 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
    * @param model - The Claude model to use
    */
   const handleSendPrompt = async (prompt: string, model: ClaudeModel) => {
+    // 🔍 诊断：记录消息发送
+    logMessageSend(claudeSessionId, prompt, model, componentIdRef.current);
+    
+    // 🔧 修复：在发送消息前验证会话是否仍然有效
+    if (claudeSessionId) {
+      const isConnected = await checkSessionConnection(claudeSessionId, api);
+      if (!isConnected) {
+        console.error(
+          '%c[SESSION_LOST] ❌ Session no longer exists in backend!',
+          'color: #F44336; font-weight: bold; font-size: 14px;',
+          { 
+            claudeSessionId, 
+            componentId: componentIdRef.current,
+            projectPath,
+            messageCount: messages.length,
+          }
+        );
+        
+        // 会话已失效，强制重新加载历史或提示用户
+        setError("会话连接已断开，正在尝试恢复历史记录...");
+        
+        try {
+          // 尝试从数据库重新加载完整历史
+          await loadSessionHistory();
+          setError(null);
+          
+          // 清除旧的会话ID，强制创建新会话但保留历史上下文
+          setClaudeSessionId(null);
+          hasActiveSessionRef.current = false;
+          isListeningRef.current = false;
+          
+          logger.info("[ClaudeCodeSession] Session reconnected, history reloaded");
+        } catch (reloadError) {
+          logger.error("[ClaudeCodeSession] Failed to reload session history:", reloadError);
+          setError("无法恢复会话历史，将以新会话继续（可能丢失部分上下文）");
+        }
+      }
+    }
+    
     logger.debug("[ClaudeCodeSession] handleSendPrompt called with:", {
       prompt,
       model,
@@ -1267,8 +1532,30 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
       // Only clean up and set up new listeners if not already listening for this session
       if (!isListeningRef.current || claudeSessionId !== extractedSessionInfo?.sessionId) {
+        // 🔍 诊断：记录监听器清理
+        if (unlistenRefs.current.length > 0) {
+          console.log(
+            '%c[EVENT_CLEANUP] 🧹 Cleaning up event listeners',
+            'color: #00BCD4; font-weight: bold;',
+            {
+              listenerCount: unlistenRefs.current.length,
+              sessionId: claudeSessionId,
+              componentId: componentIdRef.current,
+            }
+          );
+        }
+        
         // Clean up previous listeners
-        unlistenRefs.current.forEach((unlisten) => unlisten());
+        unlistenRefs.current.forEach((unlisten) => {
+          logEventListener({
+            eventName: 'unknown',
+            sessionId: claudeSessionId,
+            action: 'detached',
+            timestamp: Date.now(),
+            componentId: componentIdRef.current,
+          });
+          unlisten();
+        });
         unlistenRefs.current = [];
 
         // Mark as setting up listeners
@@ -1293,11 +1580,42 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
 
         // Helper to attach session-specific listeners **once we are sure**
         const attachSessionSpecificListeners = async (sid: string) => {
+          // 🔍 诊断：记录会话特定监听器附加
+          logEventListener({
+            eventName: `claude-output:${sid}`,
+            sessionId: sid,
+            action: 'attached',
+            timestamp: Date.now(),
+            componentId: componentIdRef.current,
+          });
+          
           logger.debug("[ClaudeCodeSession] Attaching session-specific listeners for", sid);
 
           const specificOutputUnlisten = await listen<string>(
             `claude-output:${sid}`,
             async (evt) => {
+              // 🔍 诊断：记录事件触发
+              logEventListener({
+                eventName: `claude-output:${sid}`,
+                sessionId: sid,
+                action: 'triggered',
+                timestamp: Date.now(),
+                componentId: componentIdRef.current,
+              });
+              
+              // 🔍 诊断：验证会话ID匹配
+              if (claudeSessionId !== sid) {
+                console.warn(
+                  '%c[EVENT_MISMATCH] ⚠️ Received message for different session!',
+                  'color: #FFC107; font-weight: bold; font-size: 14px;',
+                  {
+                    expectedSessionId: claudeSessionId,
+                    receivedSessionId: sid,
+                    componentId: componentIdRef.current,
+                  }
+                );
+              }
+              
               await handleStreamMessage(evt.payload);
             }
           );
@@ -1402,6 +1720,14 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             setRawJsonlOutput((prev) => [...prev, payload]);
 
             const message = JSON.parse(payload) as ClaudeStreamMessage;
+            
+            // 🔍 诊断：记录消息接收
+            logMessageReceive(
+              claudeSessionId,
+              message.type || 'unknown',
+              JSON.stringify(message).substring(0, 100),
+              componentIdRef.current
+            );
 
             // Track enhanced tool execution
             if (message.type === 'assistant' && message.message?.content) {
@@ -1726,22 +2052,48 @@ export const ClaudeCodeSession: React.FC<ClaudeCodeSessionProps> = ({
             trackEvent.modelSelected(model);
             await api.resumeClaudeCode(projectPath, effectiveSession.id, prompt, model);
           } catch (resumeError) {
-            logger.warn("[ClaudeCodeSession] Resume failed, falling back to new session with context:", resumeError);
+            logger.error("[ClaudeCodeSession] ❌ Resume failed, falling back to new session with context:", resumeError);
             
-            // Resume失败时，使用上下文摘要开始新会话
+            // 🔧 修复：提供更好的用户提示
+            setToast({
+              message: "会话已中断，正在使用历史上下文创建新会话...",
+              type: "warning"
+            });
+            
+            // Resume失败时，使用完整的上下文摘要开始新会话
             let contextPrompt = prompt;
             if (messages.length > 0) {
               const contextSummary = generateContextSummary(messages);
               if (contextSummary) {
-                contextPrompt = contextSummary + "\n\n**当前请求**: " + prompt;
-                logger.info("[ClaudeCodeSession] Added context summary due to resume failure");
+                contextPrompt = contextSummary + "\n\n---\n\n**当前请求**: " + prompt;
+                logger.info("[ClaudeCodeSession] Added enhanced context summary with tool history due to resume failure");
+                
+                // 记录上下文摘要的大小，用于调试
+                logger.debug("[ClaudeCodeSession] Context summary size:", {
+                  originalMessages: messages.length,
+                  summaryLength: contextSummary.length,
+                  summaryPreview: contextSummary.substring(0, 200)
+                });
               }
             }
             
-                         trackEvent.sessionCreated(model, 'prompt_input');
-             trackEvent.modelSelected(model);
-             await api.executeClaudeCode(projectPath, contextPrompt, model);
-           }
+            // 清除旧的会话ID，避免后续继续尝试恢复失效的会话
+            setClaudeSessionId(null);
+            hasActiveSessionRef.current = false;
+            isListeningRef.current = false;
+            
+            trackEvent.sessionCreated(model, 'prompt_input');
+            trackEvent.modelSelected(model);
+            await api.executeClaudeCode(projectPath, contextPrompt, model);
+            
+            // 显示成功提示
+            setTimeout(() => {
+              setToast({
+                message: "已使用历史上下文创建新会话，继续对话",
+                type: "info"
+              });
+            }, 1000);
+          }
         } else {
           logger.info("[ClaudeCodeSession] 🆕 Starting new session with model:", model);
           trackEvent.sessionCreated(model, 'prompt_input');

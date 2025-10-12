@@ -374,8 +374,12 @@ const TabPanel: React.FC<TabPanelProps> = ({ tab, isActive }) => {
                           projects={projects}
                           onProjectClick={handleProjectClick}
                           onProjectSettings={(project) => {
-                            // Project settings functionality can be added here if needed
+                            // 创建一个新的项目设置 Tab
                             logger.debug("Project settings clicked for:", project);
+                            // TODO: 实现项目设置功能
+                            // 可以创建一个新的 Tab 类型来显示项目设置
+                            console.warn('[TabContent] 项目设置功能尚未实现');
+                            alert(`项目设置功能开发中\n\n项目路径: ${project.path}\n\n此功能将在未来版本中提供。`);
                           }}
                           onProjectDeleted={(projectId) => {
                             // Remove the deleted project from the local state

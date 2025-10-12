@@ -362,6 +362,7 @@ function AppContent() {
    * @param newView - New view to navigate to
    */
   const handleViewChange = (newView: View) => {
+    console.log('[App] handleViewChange:', { from: view, to: newView });
     // No need for navigation protection with tabs since sessions stay open
     setView(newView);
   };
@@ -370,8 +371,15 @@ function AppContent() {
    * Handles navigating to hooks configuration
    */
   const handleProjectSettings = (project: Project) => {
+    console.log('[App] ========== handleProjectSettings 开始 ==========');
+    console.log('[App] handleProjectSettings 被调用:', {
+      project: project.path,
+      currentView: view,
+    });
     setProjectForSettings(project);
     handleViewChange("project-settings");
+    console.log('[App] 切换到 project-settings 视图');
+    console.log('[App] ========== handleProjectSettings 结束 ==========');
   };
 
   /**
@@ -380,6 +388,7 @@ function AppContent() {
    * @returns JSX element for the current view
    */
   const renderContent = () => {
+    console.log('[App] renderContent - 当前视图:', view);
     switch (view) {
       case "welcome":
         return (
@@ -562,13 +571,16 @@ function AppContent() {
 
                       {/* Project list */}
                       {projects.length > 0 ? (
-                        <ProjectList
-                          projects={projects}
-                          onProjectClick={handleProjectClick}
-                          onProjectSettings={handleProjectSettings}
-                          loading={loading}
-                          className="animate-fade-in"
-                        />
+                        <>
+                          {console.log('[App] 渲染 ProjectList, onProjectSettings:', handleProjectSettings)}
+                          <ProjectList
+                            projects={projects}
+                            onProjectClick={handleProjectClick}
+                            onProjectSettings={handleProjectSettings}
+                            loading={loading}
+                            className="animate-fade-in"
+                          />
+                        </>
                       ) : (
                         <div className="py-8 text-center">
                           <p className="text-sm text-muted-foreground">{t.projects.noProjects}</p>

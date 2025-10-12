@@ -444,34 +444,76 @@ impl ProcessRegistry {
     }
 
     /// Check if a process is still running by trying to get its status
+    /// 🔧 修复：Claude Session 使用 PID 检查而非 child handle
     #[allow(dead_code)]
     pub async fn is_process_running(&self, run_id: i64) -> Result<bool, String> {
         let processes = self.processes.lock().map_err(|e| e.to_string())?;
 
         if let Some(handle) = processes.get(&run_id) {
-            let child_arc = handle.child.clone();
-            drop(processes); // Release the lock before async operation
-
-            let mut child_guard = child_arc.lock().map_err(|e| e.to_string())?;
-            if let Some(ref mut child) = child_guard.as_mut() {
-                match child.try_wait() {
-                    Ok(Some(_)) => {
-                        // Process has exited
-                        *child_guard = None;
-                        Ok(false)
+            // 🔧 修复：对于 Claude Session，使用 PID 检查进程是否存在
+            match &handle.info.process_type {
+                ProcessType::ClaudeSession { .. } => {
+                    // Claude Session 没有 child handle，使用 PID 检查
+                    let pid = handle.info.pid;
+                    drop(processes); // Release the lock before system call
+                    
+                    // 使用系统调用检查进程是否存在
+                    #[cfg(target_os = "windows")]
+                    {
+                        use std::process::Command;
+                        let output = Command::new("tasklist")
+                            .args(&["/FI", &format!("PID eq {}", pid), "/NH"])
+                            .output();
+                        
+                        match output {
+                            Ok(output) => {
+                                let stdout = String::from_utf8_lossy(&output.stdout);
+                                Ok(stdout.contains(&pid.to_string()))
+                            }
+                            Err(_) => Ok(false)
+                        }
                     }
-                    Ok(None) => {
-                        // Process is still running
-                        Ok(true)
-                    }
-                    Err(_) => {
-                        // Error checking status, assume not running
-                        *child_guard = None;
-                        Ok(false)
+                    
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        use std::process::Command;
+                        let output = Command::new("ps")
+                            .args(&["-p", &pid.to_string()])
+                            .output();
+                        
+                        match output {
+                            Ok(output) => Ok(output.status.success()),
+                            Err(_) => Ok(false)
+                        }
                     }
                 }
-            } else {
-                Ok(false) // No child handle
+                ProcessType::AgentRun { .. } => {
+                    // Agent Run 使用原有的 child handle 检查
+                    let child_arc = handle.child.clone();
+                    drop(processes); // Release the lock before async operation
+
+                    let mut child_guard = child_arc.lock().map_err(|e| e.to_string())?;
+                    if let Some(ref mut child) = child_guard.as_mut() {
+                        match child.try_wait() {
+                            Ok(Some(_)) => {
+                                // Process has exited
+                                *child_guard = None;
+                                Ok(false)
+                            }
+                            Ok(None) => {
+                                // Process is still running
+                                Ok(true)
+                            }
+                            Err(_) => {
+                                // Error checking status, assume not running
+                                *child_guard = None;
+                                Ok(false)
+                            }
+                        }
+                    } else {
+                        Ok(false) // No child handle
+                    }
+                }
             }
         } else {
             Ok(false) // Process not found in registry
